@@ -25,7 +25,7 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ghcr.io/${{ github.repository }}:latest
+            docker pull ghcr.io/${{ github.repository_owner }}/alphahack:latest
             docker stop pii-module || true
             docker rm pii-module || true
             docker run -d --name pii-module --restart unless-stopped \
@@ -37,6 +37,6 @@ jobs:
               -e ALLOW_ANONYMOUS=true \
               -e RATE_LIMIT_RPS=1000 \
               -e MAX_PAYLOAD_CHARS=1000000 \
-              ghcr.io/${{ github.repository }}:latest
+              ghcr.io/${{ github.repository_owner }}/alphahack:latest
             sleep 5
             curl -sf http://localhost:8000/health && echo "DEPLOY OK" || echo "DEPLOY FAILED"
