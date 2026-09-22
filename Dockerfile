@@ -11,6 +11,9 @@ COPY gradlew gradlew.bat ./
 COPY gradle ./gradle
 COPY build.gradle.kts settings.gradle.kts ./
 
+# Делаем gradlew executable
+RUN chmod +x gradlew
+
 # Скачиваем зависимости (кэшируемый слой)
 RUN ./gradlew dependencies --no-daemon || true
 
