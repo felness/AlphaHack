@@ -1,0 +1,22 @@
+services:
+  pii-module:
+    build: .
+    image: pii-module:latest
+    container_name: pii-module
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - WORKERS=4
+      - ALLOWED_SYSTEMS=default,test,prod
+      - ALLOW_ANONYMOUS=true
+      - RATE_LIMIT_RPS=1000
+      - MAX_PAYLOAD_CHARS=1000000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

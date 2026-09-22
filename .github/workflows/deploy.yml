@@ -1,0 +1,42 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy on VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.VM_HOST }}
+          username: ${{ vars.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/${{ github.repository }}:latest
+            docker stop pii-module || true
+            docker rm pii-module || true
+            docker run -d --name pii-module --restart unless-stopped \
+              -p 8000:8000 \
+              -e HOST=0.0.0.0 \
+              -e PORT=8000 \
+              -e WORKERS=4 \
+              -e ALLOWED_SYSTEMS=default,test,prod \
+              -e ALLOW_ANONYMOUS=true \
+              -e RATE_LIMIT_RPS=1000 \
+              -e MAX_PAYLOAD_CHARS=1000000 \
+              ghcr.io/${{ github.repository }}:latest
+            sleep 5
+            curl -sf http://localhost:8000/health && echo "DEPLOY OK" || echo "DEPLOY FAILED"
