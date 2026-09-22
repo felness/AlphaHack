@@ -1,0 +1,49 @@
+# =============================================================================
+# Docker Compose для продакшена: приложение + Redis
+# Использование: docker compose up -d --build
+# =============================================================================
+version: "3.9"
+
+services:
+  # Приложение (Spring Boot)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pii-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      PII_STORE_TYPE: redis
+      SERVER_PORT: 8080
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 40s
+      retries: 3
+
+  # Redis (хранилище соответствий)
+  redis:
+    image: redis:7-alpine
+    container_name: pii-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis-data:

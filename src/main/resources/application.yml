@@ -1,0 +1,86 @@
+spring:
+  application:
+    name: pii-security-module
+
+  # Виртуальные потоки (Spring Boot 3.2+ / Java 21)
+  threads:
+    virtual:
+      enabled: true
+
+  # Redis
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 500ms
+      lettuce:
+        pool:
+          max-active: 32
+          max-idle: 16
+          min-idle: 4
+
+  # Jackson
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${SERVER_PORT:8080}
+  tomcat:
+    max-connections: 10000
+    accept-count: 1000
+    connection-timeout: 10s
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,refresh
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# Логирование
+logging:
+  level:
+    com.alfahack.pii: DEBUG
+    root: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
+
+# Конфигурация модуля ПД
+pii:
+  # Тип хранилища соответствий: in-memory | redis
+  store:
+    type: ${PII_STORE_TYPE:redis}
+  # Лимит размера payload (защита от DoS)
+  max-payload-size: 1000000
+  # TTL соответствий в Redis (секунды)
+  correlation-ttl-seconds: 86400
+  # Rate limiting (RPS на инстанс)
+  rate-limit-rps: 2000
+  # Системы
+  systems:
+    default:
+      enabled: true
+      masking-types: [ALL]
+      unmasking-enabled: true
+      mask-format: STAR
+
+# Circuit breaker (Resilience4j) для Redis
+resilience4j:
+  circuitbreaker:
+    instances:
+      redisStore:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 5s
+        failure-rate-threshold: 50
+        event-consumer-buffer-size: 10

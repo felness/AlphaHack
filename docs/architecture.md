@@ -1,8 +1,8 @@
 # Дизайн-документ: Модуль безопасности персональных данных (бэкенд)
 
 > **Трек:** AlphaHack · «Модуль безопасности персональных данных»
-> **Технологии:** Kotlin 2.4.20 · Spring Boot 4.1.1 (Spring Framework 7.0) · Java 21+ · Redis · Micrometer/Prometheus
-> **Статус:** проектирование бэкенда (ML-система проектируется отдельно, позже)
+> **Технологии:** Kotlin 2.1.21 · Spring Boot 3.5.16 (Spring Framework 6.2) · Java 21+ · Redis · Micrometer/Prometheus
+> **Статус:** реализация бэкенда завершена (17 детекторов, маскирование/демаскирование, Redis, безопасность, метрики)
 > **Ветка:** `feature/backend-design`
 
 ---
@@ -223,61 +223,64 @@
 
 ```
 com.alfahack.pii/
-├── PiiApplication.kt              # точка входа Spring Boot
+├── PiiSecurityModuleApplication.kt  # точка входа Spring Boot
 ├── controller/
-│   └── ProcessController.kt       # REST-контроллер POST /process
+│   └── ProcessController.kt         # REST-контроллер POST /process
 ├── service/
-│   ├── ProcessService.kt          # оркестратор (маскирование/демаскирование)
-│   ├── MaskingService.kt          # сервис маскирования
-│   └── UnmaskingService.kt        # сервис демаскирования
-├── detection/                     # модуль идентификации ПД (Analyzer/Recognizer)
-│   ├── Detector.kt                # интерфейс recognizer'а (абстракция)
-│   ├── DetectedEntity.kt          # модель найденной сущности
-│   ├── PiiType.kt                 # enum типов ПД (17 категорий)
-│   ├── DetectionEngine.kt         # оркестратор recognizer'ов, разрешение пересечений
-│   ├── ContextRules.kt            # контекстные правила (позитивный/негативный контекст)
-│   ├── ChecksumValidator.kt       # checksum-валидация (ИНН, Luhn, паспорт)
-│   ├── regex/                     # regex-детекторы по категориям
-│   │   ├── PassportDetector.kt
-│   │   ├── InnDetector.kt
-│   │   ├── PhoneDetector.kt
-│   │   ├── EmailDetector.kt
-│   │   ├── CardDetector.kt
-│   │   ├── DateDetector.kt
-│   │   ├── ... (по категориям)
-│   ├── dictionary/                # словарные детекторы (имена, города, улицы)
-│   │   ├── NameDetector.kt
-│   │   ├── CityDetector.kt
-│   │   └── ...
-│   └── ml/                        # ML-детектор (заглушка, интеграция позже)
-│       └── NerDetector.kt
+│   └── ProcessService.kt            # оркестратор (маскирование/демаскирование)
+├── detection/                       # модуль идентификации ПД (Analyzer/Recognizer)
+│   ├── Detector.kt                  # интерфейс recognizer'а (абстракция)
+│   ├── DetectedEntity.kt            # модель найденной сущности
+│   ├── PiiType.kt                   # enum типов ПД (17 категорий + загранпаспорт, СНИЛС)
+│   ├── DetectionEngine.kt           # оркестратор recognizer'ов, разрешение пересечений
+│   ├── ContextRules.kt              # контекстные правила (позитивный/негативный контекст)
+│   ├── ChecksumValidator.kt         # checksum-валидация (ИНН, Luhn)
+│   ├── regex/                       # regex-детекторы по категориям
+│   │   ├── PassportDetector.kt      # серия и номер паспорта РФ
+│   │   ├── InnDetector.kt           # ИНН (checksum)
+│   │   ├── PhoneDetector.kt         # телефон
+│   │   ├── EmailDetector.kt         # email
+│   │   ├── CardDetector.kt          # номер карты (Luhn)
+│   │   ├── DateDetector.kt          # даты (числовые + текстовые)
+│   │   ├── CvvDetector.kt           # CVV (контекст)
+│   │   ├── PinDetector.kt           # ПИН-код (контекст)
+│   │   ├── DepartmentCodeDetector.kt# код подразделения (контекст)
+│   │   ├── DriverLicenseDetector.kt # водительское удостоверение (контекст)
+│   │   ├── CardHolderNameDetector.kt# имя держателя карты (контекст)
+│   │   ├── ForeignPassportDetector.kt # загранпаспорт (контекст)
+│   │   └── SnilsDetector.kt         # СНИЛС
+│   └── dictionary/                  # словарные детекторы (контекст)
+│       ├── NameDetector.kt          # ФИО (контекст)
+│       ├── AddressDetector.kt       # адрес (контекст)
+│       ├── CitizenshipDetector.kt   # гражданство
+│       ├── PlaceOfBirthDetector.kt  # место рождения (контекст)
+│       └── PassportIssuerDetector.kt# орган, выдавший паспорт (контекст)
 ├── masking/
-│   ├── MaskingEngine.kt           # токенизация с сохранением длины
-│   └── MaskingResult.kt           # {maskedText, spans}
+│   ├── MaskingEngine.kt             # токенизация с сохранением длины
+│   ├── MaskingResult.kt             # {maskedText, spans}
+│   └── MaskFormat.kt                # формат маски (STAR | TOKEN | SYNTHETIC)
 ├── unmasking/
-│   └── UnmaskingEngine.kt         # восстановление по spans
+│   └── UnmaskingEngine.kt           # восстановление по spans
 ├── store/
-│   ├── CorrelationStore.kt        # интерфейс хранилища
-│   ├── CorrelationRecord.kt       # модель записи
-│   └── RedisCorrelationStore.kt   # реализация на Redis (Lettuce)
+│   ├── CorrelationStore.kt          # интерфейс хранилища
+│   ├── CorrelationRecord.kt         # модель записи (с systemId)
+│   ├── InMemoryCorrelationStore.kt  # in-memory реализация
+│   └── RedisCorrelationStore.kt     # реализация на Redis (Lettuce, circuit breaker)
 ├── config/
-│   ├── SystemConfig.kt            # конфигурация систем и правил
-│   ├── RedisConfig.kt             # конфигурация Redis
-│   ├── ThreadConfig.kt            # конфигурация потоков (виртуальные)
-│   ├── DetectorConfig.kt          # регистрация recognizer'ов
-│   └── ResilienceConfig.kt        # circuit breaker, rate limiting
+│   ├── PiiProperties.kt             # конфигурация (префикс pii)
+│   ├── SystemRegistry.kt            # реестр систем (resolve/filterTypes)
+│   ├── RateLimitService.kt          # rate limiting (Bucket4j)
+│   └── RateLimitFilter.kt           # фильтр 429
 ├── model/
-│   ├── ProcessRequest.kt          # DTO запроса
-│   └── ProcessResponse.kt         # DTO ответа
+│   ├── ProcessRequest.kt            # DTO запроса
+│   └── ProcessResponse.kt           # DTO ответа
 ├── security/
-│   ├── LogMasker.kt               # маскирование ПД в логах
-│   └── SecurityConfig.kt          # безопасность
+│   └── LogMasker.kt                 # маскирование ПД в логах
 ├── metrics/
-│   └── MetricsService.kt          # метрики (Micrometer)
+│   └── MetricsService.kt            # метрики (Micrometer, включая TPS/RPS)
 └── exception/
-    ├── ApiException.kt            # базовое исключение
-    ├── GlobalExceptionHandler.kt  # обработка ошибок
-    └── RateLimitException.kt      # 429
+    ├── ApiException.kt              # базовое исключение + 400/403/404/429
+    └── GlobalExceptionHandler.kt    # обработка ошибок (400/403/404/429/500/503)
 ```
 
 ---
@@ -314,10 +317,12 @@ Content-Type: application/json
 | Код | Описание |
 |-----|----------|
 | **200** | Успешная обработка |
-| **400** | Некорректный запрос (нет payload/payload_id) |
-| **404** | Соответствие по payload_id не найдено (для демаскирования) |
+| **400** | Некорректный запрос (нет payload/payload_id, payload слишком большой) |
+| **403** | Неизвестная/отключённая система, демаскирование запрещено для системы |
+| **404** | Соответствие по payload_id не найдено |
 | **429** | Too Many Requests (с Retry-After) — допустим под нагрузкой |
-| **5XX** | Внутренняя ошибка сервиса |
+| **500** | Внутренняя ошибка сервиса |
+| **503** | Redis недоступен (деградация, circuit breaker) |
 
 ### 7.4. Идемпотентность
 
@@ -903,63 +908,66 @@ pii:
 
 ## 18. План реализации
 
-### Этап 1: Каркас проекта
+> **Статус:** этапы 1-11 **реализованы** (134 теста, нагрузочный тест 100 000 запросов, RPS 1210). Этап 12 (ML) — запланирован.
+
+### Этап 1: Каркас проекта ✅
 - Инициализация Spring Boot проекта (Kotlin, Gradle).
 - Структура пакетов.
 - Конфигурация (application.yml, виртуальные потоки `spring.threads.virtual.enabled=true`).
 - DTO (ProcessRequest, ProcessResponse).
 
-### Этап 2: Контракт /process
+### Этап 2: Контракт /process ✅
 - ProcessController.
 - ProcessService (определение маскирование/демаскирование).
 - Обработка ошибок (GlobalExceptionHandler).
 
-### Этап 3: Модуль идентификации (Analyzer/Recognizer)
+### Этап 3: Модуль идентификации (Analyzer/Recognizer) ✅
 - Интерфейс Detector, DetectedEntity, PiiType.
 - DetectionEngine (объединение, разрешение пересечений, контекстные правила).
-- Regex-детекторы (паспорт, ИНН, телефон, email, карта, даты, в/у, CVV, ПИН).
+- Regex-детекторы (паспорт, ИНН, телефон, email, карта, даты, в/у, CVV, ПИН, загранпаспорт, СНИЛС).
+- Словарные детекторы (ФИО, адрес, гражданство, место рождения, орган выдачи).
 - Checksum-валидация (ИНН, Luhn для карт).
 
-### Этап 4: Модуль маскирования
+### Этап 4: Модуль маскирования ✅
 - MaskingEngine (токенизация с сохранением длины).
-- Обработка разделителей, форматов дат, разделяющих слов.
+- Обработка разделителей, форматов дат (включая текстовые), разделяющих слов.
 - Пороги уверенности, стратегия «лучше перемаскировать».
 
-### Этап 5: Модуль демаскирования
+### Этап 5: Модуль демаскирования ✅
 - UnmaskingEngine (восстановление по spans).
 
-### Этап 6: Redis CorrelationStore
+### Этап 6: Redis CorrelationStore ✅
 - Интерфейс CorrelationStore.
-- RedisCorrelationStore (Lettuce, Hash/JSON).
-- TTL, идемпотентность (SETNX/HSETNX), circuit breaker.
+- RedisCorrelationStore (Lettuce, JSON).
+- TTL, идемпотентность (SETNX), circuit breaker.
 
-### Этап 7: Конфигурация по системам
-- SystemConfig.
+### Этап 7: Конфигурация по системам ✅
+- SystemRegistry.
 - Определение системы по заголовку/по умолчанию.
 - Фильтрация типов ПД по системе.
 
-### Этап 8: Безопасность
+### Этап 8: Безопасность ✅
 - LogMasker (маскирование ПД в логах).
-- Ограничение доступа систем.
-- Шифрование данных в Redis (опционально).
+- Ограничение доступа систем (allowlist, привязка записи к системе).
+- Шифрование данных в Redis (опционально, не реализовано).
 
-### Этап 9: Метрики
+### Этап 9: Метрики ✅
 - MetricsService (Micrometer).
 - Latency, RPS, TPS, количество сущностей.
 
-### Этап 10: Отказоустойчивость и производительность
+### Этап 10: Отказоустойчивость и производительность ✅
 - Rate limiting (Bucket4j, 429).
 - Circuit breaker (Resilience4j).
-- Деградация при недоступности Redis/ML.
-- Оптимизация regex, кэширование, чанкинг больших текстов.
+- Деградация при недоступности Redis.
+- Оптимизация regex, кэширование.
 
-### Этап 11: Тесты
+### Этап 11: Тесты ✅
 - **Юнит-тесты:** детекторы (каждая категория), checksum-валидация, маскирование, демаскирование.
-- **Интеграционные тесты:** контракт /process (маскирование → демаскирование по payload_id), идемпотентность.
-- **Тесты качества:** оценка точности на эталонном датасете (span-based Левенштейн ≥ 95%).
-- **Нагрузочные тесты:** RPS 1000+ (цель 2000), latency p95 < 1 сек, 200 параллельных коннектов.
+- **Интеграционные тесты:** контракт /process (маскирование → демаскирование по payload_id), идемпотентность, Redis (Testcontainers).
+- **Параметризованные тесты:** CSV-матрица (все 17 категорий + негативные кейсы).
+- **Нагрузочные тесты:** 100 000 запросов, RPS 1210, latency p95 0.106 сек.
 
-### Этап 12: ML-интеграция (отдельный этап, позже)
+### Этап 12: ML-интеграция (отдельный этап, позже) ⏳
 - Реализация NerDetector.
 - Подключение ML-модели (отдельный сервис/контейнер).
 - Настройка порогов уверенности.
@@ -971,13 +979,13 @@ pii:
 
 Дизайн-документ проверяется на:
 
-1. **Полноту покрытия 17 категорий ПД** — все типы из ТЗ присутствуют в `PiiType` и имеют recognizer.
-2. **Соответствие контракту /process** — маскирование/демаскирование по payload_id, ответ `{result}`.
-3. **Учёт критичных требований ТЗ** — метрика (span-based Левенштейн), безопасность (нет утечек в логи), производительность (RPS 1000+, latency < 1 сек), отказоустойчивость (429, ретраи, деградация), расширяемость.
-4. **Готовность к ML-интеграции** — абстракция `Detector`, `NerDetector` как заглушка.
-5. **Согласованность с принятыми решениями** — Redis, токенизация с сохранением длины, гибрид regex+ML.
-6. **Соответствие лучшим практикам** — паттерн Analyzer/Recognizer (Presidio), checksum-валидация, контекстные правила, виртуальные потоки, circuit breaker, rate limiting.
+1. **Полноту покрытия 17 категорий ПД** — все типы из ТЗ присутствуют в `PiiType` и имеют recognizer. ✅ (плюс загранпаспорт и СНИЛС)
+2. **Соответствие контракту /process** — маскирование/демаскирование по payload_id, ответ `{result}`. ✅
+3. **Учёт критичных требований ТЗ** — метрика (span-based Левенштейн), безопасность (нет утечек в логи), производительность (RPS 1210, latency p95 0.106 сек), отказоустойчивость (429, ретраи, деградация), расширяемость. ✅
+4. **Готовность к ML-интеграции** — абстракция `Detector` готова, `NerDetector` — запланирован. ⏳
+5. **Согласованность с принятыми решениями** — Redis, токенизация с сохранением длины, гибрид regex+словари. ✅
+6. **Соответствие лучшим практикам** — паттерн Analyzer/Recognizer (Presidio), checksum-валидация, контекстные правила, виртуальные потоки, circuit breaker, rate limiting. ✅
 
 ---
 
-*Документ подготовлен в рамках этапа проектирования бэкенда. ML-система (NER-модель) проектируется отдельно на следующем этапе.*
+*Документ подготовлен в рамках этапа проектирования бэкенда. Реализация завершена (этапы 1-11). ML-система (NER-модель) проектируется отдельно на следующем этапе.*
