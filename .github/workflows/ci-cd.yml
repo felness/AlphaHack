@@ -5,7 +5,8 @@ name: CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [main]  # автодеплой при push/merge в main
+  workflow_dispatch:  # ручной деплой из любой ветки (кнопка "Run workflow")
   pull_request:
     branches: [main]
 
@@ -51,12 +52,14 @@ jobs:
           retention-days: 7
 
   # =========================================================================
-  # Deploy: автодеплой на сервер (только push в main, не PR)
+  # Deploy: автодеплой на сервер
+  # - push в main → автоматически
+  # - workflow_dispatch → вручную из любой ветки
   # =========================================================================
   deploy:
     name: Deploy to Server
-    # Untrusted PR guardrail: деплой только из доверенного репозитория
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Деплой при push в main ИЛИ при ручном запуске (не PR)
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: ubuntu-latest
     environment: production
@@ -75,8 +78,10 @@ jobs:
           script: |
             set -e
             cd /opt/pii-security-module || exit 1
-            git pull origin main
+            git fetch --all
+            git checkout ${{ github.ref_name }}
+            git pull origin ${{ github.ref_name }}
             docker compose down || true
             docker compose up -d --build
             docker image prune -f
-            echo "Deploy completed"
+            echo "Deploy completed from branch: ${{ github.ref_name }}"
