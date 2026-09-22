@@ -5,7 +5,7 @@ name: CI/CD
 
 on:
   push:
-    branches: [main]  # автодеплой при push/merge в main
+    branches: [main, 'feature/**']  # автодеплой при push в main или feature-ветки
   workflow_dispatch:  # ручной деплой из любой ветки (кнопка "Run workflow")
   pull_request:
     branches: [main]
@@ -53,13 +53,13 @@ jobs:
 
   # =========================================================================
   # Deploy: автодеплой на сервер
-  # - push в main → автоматически
+  # - push в main или feature-ветки → автоматически
   # - workflow_dispatch → вручную из любой ветки
   # =========================================================================
   deploy:
     name: Deploy to Server
-    # Деплой при push в main ИЛИ при ручном запуске (не PR)
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    # Деплой при push в main/feature ИЛИ при ручном запуске (не PR)
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/feature/'))) || github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: ubuntu-latest
     environment: production
