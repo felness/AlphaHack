@@ -27,18 +27,26 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker network create pii-net 2>/dev/null || true
+            docker pull redis:7-alpine
+            docker stop pii-redis 2>/dev/null || true
+            docker rm pii-redis 2>/dev/null || true
+            docker run -d --name pii-redis --restart unless-stopped --network pii-net redis:7-alpine
             docker pull ghcr.io/${{ github.repository_owner }}/alphahack:latest
-            docker stop pii-module || true
-            docker rm pii-module || true
+            docker stop pii-module 2>/dev/null || true
+            docker rm pii-module 2>/dev/null || true
             docker run -d --name pii-module --restart unless-stopped \
               -p 8000:8000 \
               -e HOST=0.0.0.0 \
               -e PORT=8000 \
               -e WORKERS=4 \
+              -e REDIS_HOST=pii-redis \
+              -e REDIS_PORT=6379 \
               -e ALLOWED_SYSTEMS=default,test,prod \
               -e ALLOW_ANONYMOUS=true \
               -e RATE_LIMIT_RPS=1000 \
               -e MAX_PAYLOAD_CHARS=1000000 \
+              --network pii-net \
               ghcr.io/${{ github.repository_owner }}/alphahack:latest
             sleep 5
             curl -sf http://localhost:8000/health && echo "DEPLOY OK" || echo "DEPLOY FAILED"

@@ -1,14 +1,16 @@
-"""In-memory хранилище соответствий payload_id → замаскированные данные.
+"""Redis-хранилище соответствий payload_id → замаскированные данные.
 
-Потокобезопасно (threading.Lock). Поддерживает TTL для автоматической
-очистки устаревших записей. Для одного инстанса достаточно; для
-масштабирования на несколько инстансов можно заменить на Redis.
+Общее хранилище для всех воркеров uvicorn. Потокобезопасно (Redis атомарен).
+Поддерживает TTL для автоматической очистки устаревших записей.
 """
 from __future__ import annotations
 
-import threading
+import json
+import os
 import time
 from dataclasses import dataclass, field
+
+import redis
 
 from .masking import MaskedSpan
 
@@ -22,44 +24,47 @@ class Record:
     created_at: float = field(default_factory=time.time)
 
 
-class MaskStore:
-    """Потокобезопасное хранилище соответствий."""
+class RedisMaskStore:
+    """Redis-хранилище соответствий."""
 
-    def __init__(self, ttl_sec: float = 3600.0, max_entries: int = 1_000_000):
+    def __init__(self, ttl_sec: float = 3600.0):
         self._ttl = ttl_sec
-        self._max_entries = max_entries
-        self._data: dict[str, Record] = {}
-        self._lock = threading.Lock()
+        self._redis = redis.Redis(
+            host=os.getenv("REDIS_HOST", "redis"),
+            port=int(os.getenv("REDIS_PORT", "6379")),
+            decode_responses=True,
+        )
 
     def put(self, payload_id: str, record: Record) -> None:
-        """Сохраняет запись. При переполнении удаляет самые старые."""
-        with self._lock:
-            self._data[payload_id] = record
-            if len(self._data) > self._max_entries:
-                self._evict_oldest()
+        """Сохраняет запись с TTL."""
+        data = {
+            "original_text": record.original_text,
+            "masked_text": record.masked_text,
+            "spans": [s.__dict__ for s in record.spans],
+            "created_at": record.created_at,
+        }
+        self._redis.setex(f"pii:{payload_id}", int(self._ttl), json.dumps(data))
 
     def get(self, payload_id: str) -> Record | None:
         """Возвращает запись или None, если её нет/истекла."""
-        with self._lock:
-            record = self._data.get(payload_id)
-            if record is None:
-                return None
-            if time.time() - record.created_at > self._ttl:
-                del self._data[payload_id]
-                return None
-            return record
-
-    def _evict_oldest(self) -> None:
-        """Удаляет самую старую запись."""
-        if not self._data:
-            return
-        oldest_id = min(self._data, key=lambda k: self._data[k].created_at)
-        del self._data[oldest_id]
+        raw = self._redis.get(f"pii:{payload_id}")
+        if raw is None:
+            return None
+        try:
+            data = json.loads(raw)
+            spans = [MaskedSpan(**s) for s in data.get("spans", [])]
+            return Record(
+                original_text=data["original_text"],
+                masked_text=data["masked_text"],
+                spans=spans,
+                created_at=data.get("created_at", time.time()),
+            )
+        except Exception:
+            return None
 
     def __len__(self) -> int:
-        with self._lock:
-            return len(self._data)
+        return 0
 
 
 # Глобальный экземпляр хранилища
-store = MaskStore()
+store = RedisMaskStore()

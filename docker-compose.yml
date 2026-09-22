@@ -1,15 +1,27 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: pii-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
   pii-module:
     build: .
     image: pii-module:latest
     container_name: pii-module
     restart: unless-stopped
+    depends_on:
+      - redis
     ports:
       - "8000:8000"
     environment:
       - HOST=0.0.0.0
       - PORT=8000
       - WORKERS=4
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - ALLOWED_SYSTEMS=default,test,prod
       - ALLOW_ANONYMOUS=true
       - RATE_LIMIT_RPS=1000
@@ -20,3 +32,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+
+volumes:
+  redis-data:
