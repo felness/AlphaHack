@@ -1,225 +1,163 @@
-# AlphaHack — Модуль безопасности персональных данных
+# AlphaHack — модуль защиты персональных данных
 
-Прокси-сервис между системой-потребителем и LLM: **идентификация → маскирование → демаскирование** персональных данных (17 категорий).
+Backend-сервис на Kotlin/Spring Boot, который обнаруживает персональные данные (ПД) в тексте, маскирует их перед передачей во внешнюю систему и восстанавливает исходные значения в ответе.
 
+```text
+Система-потребитель → POST /process → обнаружение ПД → маскирование
+Система-потребитель ← POST /process ← восстановление ← замаскированный ответ
 ```
-Система-потребитель → Модуль (идентификация → маскирование) → LLM
-Система-потребитель ← Модуль (демаскирование) ← LLM
-```
 
-## Технологии
+## Возможности
 
-- **Kotlin** 2.1.21
-- **Spring Boot** 3.5.16 (Spring Framework 6.2)
-- **Java** 21+ (виртуальные потоки)
-- **Redis** 7 (Lettuce)
-- **Micrometer / Prometheus** (метрики)
-- **Resilience4j** (circuit breaker)
-- **Bucket4j** (rate limiting)
+- единый API `POST /process` для маскирования и демаскирования;
+- 17 обязательных категорий ПД из задания и 2 дополнительные: СНИЛС и загранпаспорт;
+- regex-, checksum-, словарные и контекстные детекторы;
+- сохранение длины и разделителей при маскировании;
+- форматы маски `STAR`, `TOKEN` и `SYNTHETIC`;
+- Redis с TTL для хранения соответствий либо in-memory режим для локальной разработки;
+- отдельные правила для систем-потребителей через заголовок `X-System-Id`;
+- rate limiting, circuit breaker и безопасные агрегированные метрики;
+- виртуальные потоки Java 21.
+
+## Стек
+
+- Kotlin 2.1.21;
+- Java 21;
+- Spring Boot 3.5.16;
+- Redis 7;
+- Gradle 8.14.2;
+- Micrometer/Prometheus, Resilience4j, Bucket4j.
 
 ## Быстрый старт
 
-### 1. Запуск Redis
+### Вариант 1: Docker Compose
+
+Требуется Docker с Compose.
 
 ```bash
-cd local-environment
-docker compose up -d redis
+docker compose up --build
 ```
 
-### 2. Сборка и запуск сервиса
+Сервис будет доступен на `http://localhost:8080`, Redis — на `localhost:6379`.
+
+### Вариант 2: локальный запуск
+
+Требуются JDK 21 и запущенный Redis:
 
 ```bash
-gradle bootJar
-java -jar build/libs/pii-security-module-0.0.1-SNAPSHOT.jar --server.port=8080
+docker compose -f local-environment/docker-compose.yml up -d
+./gradlew bootRun
 ```
 
-### 3. Проверка
+Для разработки без Redis можно использовать in-memory хранилище:
 
 ```bash
-# Health check
-curl http://localhost:8080/actuator/health
-
-# Маскирование (первый запрос с новым payload_id)
-curl -X POST http://localhost:8080/process \
-  -H "Content-Type: application/json" \
-  -d '{"payload":"паспорт 4509 123456, email ivanov@mail.ru","payload_id":"test-1"}'
-# → {"result":"паспорт **** ******, email ******@****.**"}
-
-# Демаскирование (второй запрос с тем же payload_id)
-curl -X POST http://localhost:8080/process \
-  -H "Content-Type: application/json" \
-  -d '{"payload":"паспорт **** ******, email ******@****.**","payload_id":"test-1"}'
-# → {"result":"паспорт 4509 123456, email ivanov@mail.ru"}
+PII_STORE_TYPE=in-memory ./gradlew bootRun
 ```
 
-## API-контракт
+## API
 
-```
+### Запрос
+
+```http
 POST /process
 Content-Type: application/json
+X-System-Id: default
 
-Запрос:  { "payload": "<строка>", "payload_id": "<идентификатор>" }
-Ответ:   { "result": "<строка>" }
-```
-
-| Шаг | payload_id | payload | Действие | Ответ |
-|-----|------------|---------|----------|-------|
-| 1 | новый | исходная строка | **маскирование** | маска |
-| 2 | тот же | ваша маска | **демаскирование** | исходная строка |
-
-### Коды ответов
-
-| Код | Описание |
-|-----|----------|
-| **200** | Успешная обработка |
-| **400** | Некорректный запрос (нет payload/payload_id, payload слишком большой) |
-| **403** | Неизвестная или отключённая система (`X-System-Id`) |
-| **404** | Соответствие по payload_id не найдено |
-| **429** | Too Many Requests (с `Retry-After`) |
-| **500** | Внутренняя ошибка |
-| **503** | Redis недоступен (деградация) |
-
-## Идентифицируемые типы ПДН (17 категорий)
-
-| № | Тип | Пример | Детектор |
-|---|-----|--------|----------|
-| 1 | ФИО | Иванов Иван Иванович | `NameDetector` (словарный, контекст) |
-| 2 | Дата рождения | 12.05.1990 | `DateDetector` |
-| 3 | Место рождения | г. Москва | `PlaceOfBirthDetector` (словарный, контекст) |
-| 4 | Серия и номер паспорта | 4509 123456 | `PassportDetector` |
-| 5 | Гражданство | гражданин РФ | `CitizenshipDetector` (словарный) |
-| 6 | Орган, выдавший паспорт | ОУФМС России по г. Москве | `PassportIssuerDetector` (словарный, контекст) |
-| 7 | Код подразделения | 770-001 | `DepartmentCodeDetector` (контекст) |
-| 8 | Дата выдачи паспорта | 15.03.2015 | `DateDetector` (по контексту) |
-| 9 | Водительское удостоверение | 77 12 345678 | `DriverLicenseDetector` (контекст) |
-| 10 | Адрес | г. Москва, ул. Тверская, д. 1 | `AddressDetector` (словарный, контекст) |
-| 11 | Email | ivanov@mail.ru | `EmailDetector` |
-| 12 | Телефон | +7 (900) 123-45-67 | `PhoneDetector` |
-| 13 | ИНН | 770100000079 | `InnDetector` (checksum) |
-| 14 | Номер карты | 4276 1234 5678 9014 | `CardDetector` (Luhn) |
-| 15 | CVV | 123 | `CvvDetector` (контекст) |
-| 16 | ПИН-код | 1234 | `PinDetector` (контекст) |
-| 17 | Имя держателя карты | IVANOV IVAN | `CardHolderNameDetector` (контекст) |
-
-## Настройка
-
-### Конфигурация систем-потребителей
-
-В `src/main/resources/application.yml` (секция `pii.systems`):
-
-```yaml
-pii:
-  systems:
-    default:                    # система по умолчанию (запросы без заголовка X-System-Id)
-      enabled: true
-      masking-types: [ALL]      # какие типы ПДН маскировать (ALL = все)
-      unmasking-enabled: true   # демаскирование вкл/выкл
-      mask-format: STAR         # формат маски (STAR | TOKEN)
-    system-a:
-      enabled: true
-      masking-types: [FULL_NAME, PASSPORT_SERIES_NUMBER, PHONE, EMAIL]
-      unmasking-enabled: true
-    system-b:
-      enabled: false            # доступ отключён
-```
-
-- **Определение системы:** по заголовку `X-System-Id`. Если заголовка нет → система `default`.
-- **Фильтрация типов ПДН:** система маскирует только перечисленные типы.
-- **Демаскирование:** `unmasking-enabled: false` запрещает демаскирование для системы.
-- **Формат маски:** `STAR` (`*`) или `TOKEN` (`X`).
-
-### Расширение списка ПДН
-
-Новый тип ПДН = новый детектор (реализует интерфейс `Detector`) + значение в `PiiType` + правило в конфиге. Ядро не переписывается.
-
-```kotlin
-@Component
-class MyDetector : Detector {
-    override val supportedTypes: Set<PiiType> = setOf(PiiType.MY_TYPE)
-    override fun detect(text: String): List<DetectedEntity> { ... }
+{
+  "payload": "паспорт 4509 123456, email ivanov@mail.ru",
+  "payload_id": "demo-1"
 }
 ```
 
-## Безопасность
+Заголовок `X-System-Id` необязателен: без него используется система `default`.
 
-- **Логирование:** логируются только типы ПДН и агрегаты, **никогда** — значения (`LogMasker`).
-- **Метрики:** только агрегаты (latency, RPS, количество), без значений ПДН.
-- **Ограничение систем:** только системы из конфигурации имеют доступ (403 для неизвестных).
-- **Rate limiting:** Bucket4j → 429 с `Retry-After`.
-- **Circuit breaker:** Resilience4j → 503 при недоступности Redis.
-- **Ограничение размера payload:** защита от DoS (400 при превышении `max-payload-size`).
+### Маскирование
 
-## Метрики и мониторинг
-
-- `/actuator/prometheus` — метрики Prometheus
-- `/actuator/health` — health-check (включая Redis)
-
-Ключевые метрики: `pii_requests_total`, `pii_requests_masking_total`, `pii_requests_unmasking_total`, `pii_latency_seconds`, `pii_entities_detected_total`, `pii_rate_limited_total`.
-
-### Локальный мониторинг (Prometheus + Grafana)
-
-Мониторинг запускается **локально** на машине разработчика и скрейпит метрики с удалённого сервера через интернет. На сервер ничего ставить не нужно.
+Первый запрос с новым `payload_id` обнаруживает ПД, сохраняет соответствие и возвращает маску:
 
 ```bash
-docker compose -f docker-compose.monitoring.yml up -d
+curl -X POST http://localhost:8080/process \
+  -H 'Content-Type: application/json' \
+  -d '{"payload":"паспорт 4509 123456, email ivanov@mail.ru","payload_id":"demo-1"}'
 ```
 
-- **Grafana:** http://localhost:3000 (admin / admin)
-- **Prometheus:** http://localhost:9090
+```json
+{"result":"паспорт **** ******, email ******@****.**"}
+```
 
-Дашборд **«PII Security Module — Overview»** (папка `PII`) показывает:
-- RPS (всего / маскирование / демаскирование)
-- Latency p50/p95/p99 (общая и по направлениям)
-- Количество запросов и ошибок
-- Типы обнаруженных ПД (17 категорий)
-- Rate limited (429) и error rate
+### Демаскирование
 
-> Конфиги мониторинга (`docker-compose.monitoring.yml`, `monitoring/`) не заливаются на гит — они локальные (см. `.gitignore`).
+Повторный запрос с тем же `payload_id` и полученной маской восстанавливает исходный текст:
 
-## Производительность
+```bash
+curl -X POST http://localhost:8080/process \
+  -H 'Content-Type: application/json' \
+  -d '{"payload":"паспорт **** ******, email ******@****.**","payload_id":"demo-1"}'
+```
 
-Результаты нагрузочного теста (`load_test.py`, 100 000 запросов, 100 параллельно):
+```json
+{"result":"паспорт 4509 123456, email ivanov@mail.ru"}
+```
 
-| Метрика | Значение |
-|---------|----------|
-| Успешных запросов | 100% |
-| Roundtrip OK | 100% |
-| RPS | 1210 |
-| Latency p50 | 0.028 сек |
-| Latency p95 | 0.106 сек |
-| Latency p99 | 0.131 сек |
+Повтор исходного текста с тем же `payload_id` идемпотентен и возвращает ранее созданную маску. Запись привязана к системе-потребителю: демаскирование от имени другой системы запрещено.
 
-## Инструкция для жюри
+### Коды ответов
 
-1. **Запустить сервис** (см. «Быстрый старт»).
-2. **Отправить тестовый текст** на маскирование:
-   ```bash
-   curl -X POST http://localhost:8080/process \
-     -H "Content-Type: application/json" \
-     -d '{"payload":"Иванов Иван Иванович, паспорт 4509 123456, email ivanov@mail.ru, телефон +7 (900) 123-45-67","payload_id":"demo-1"}'
-   ```
-3. **Получить замаскированный результат** — ПДН заменены на `*`.
-4. **Отправить маску обратно** с тем же `payload_id` — получить оригинал.
-5. **Проверить ловушки**: «поэт Александр Пушкин», «адрес отделения Банка» — не маскируются.
-6. **Посмотреть логи** — типы ПДН без значений.
-7. **Посмотреть метрики** — `/actuator/prometheus`.
+| Код | Значение |
+|---:|---|
+| `200` | Запрос обработан |
+| `400` | Некорректный JSON, пустые поля или превышен лимит `payload` |
+| `403` | Система неизвестна, отключена или не владеет записью |
+| `429` | Превышен лимит запросов; возвращается `Retry-After` |
+| `500` | Непредвиденная внутренняя ошибка |
+| `503` | Redis недоступен или circuit breaker открыт |
 
-## Ограничения и план развития
+## Поддерживаемые типы ПД
 
-### Ограничения
-- **Даты текстом** («двенадцатого мая») не распознаются (только числовые форматы).
-- **Документы кроме паспорта РФ** (загранпаспорт, СНИЛС) не распознаются.
-- **Контекстное маскирование** (PIN + карта) не реализовано.
-- **RPS 2000** не достигнут (текущий 1210).
+Обязательные категории: ФИО, дата и место рождения, паспорт РФ, гражданство, орган выдачи паспорта, код подразделения, дата выдачи паспорта, водительское удостоверение, адрес, email, телефон, ИНН, номер карты, CVV, PIN и имя держателя карты.
 
-### План развития
-- ML/NER-модель для неструктурированных типов (ФИО, адреса) — повышение точности.
-- Распознавание дат текстом и дополнительных документов.
-- Контекстное маскирование по комбинации типов.
-- Оптимизация для RPS 2000 (кэширование, асинхронность).
+Дополнительно реализованы СНИЛС и загранпаспорт. Полная карта детекторов и правила разрешения пересечений описаны в [архитектуре](docs/architecture.md).
 
-## Документация
+## Конфигурация
 
-- [Дизайн-документ](docs/architecture.md) — полная архитектура
-- [Тестовая матрица](docs/test-matrix.md) — план тест-кейсов
-- [Отчёт ревью](docs/review-report.md) — анализ соответствия требованиям
+Основные параметры находятся в `src/main/resources/application.yml`.
+
+| Параметр | Значение по умолчанию | Назначение |
+|---|---:|---|
+| `pii.store.type` | `redis` | `redis` или `in-memory` |
+| `pii.max-payload-size` | `1000000` | Максимальная длина текста в символах |
+| `pii.correlation-ttl-seconds` | `86400` | TTL записи в Redis |
+| `pii.rate-limit-rps` | `2000` | Лимит запросов в секунду на экземпляр |
+| `pii.systems.default.masking-types` | `[ALL]` | Разрешённые типы ПД |
+| `pii.systems.default.unmasking-enabled` | `true` | Разрешение демаскирования |
+| `pii.systems.default.mask-format` | `STAR` | `STAR`, `TOKEN` или `SYNTHETIC` |
+
+Для Redis используются `REDIS_HOST`, `REDIS_PORT` и `REDIS_PASSWORD`; порт приложения задаётся через `SERVER_PORT`.
+
+## Проверка качества
+
+```bash
+./gradlew clean test
+./gradlew ktlintCheck
+```
+
+Интеграционные тесты Redis выполняются при доступном Docker; без Docker они пропускаются. Скрипт `load_test.py` предназначен для отдельного нагрузочного прогона уже запущенного сервиса.
+
+## Структура
+
+```text
+src/main/kotlin/com/alfahack/pii/
+├── controller/    # HTTP API
+├── service/       # оркестрация потока обработки
+├── detection/     # детекторы и разрешение пересечений
+├── masking/       # создание маски
+├── unmasking/     # восстановление значений
+├── store/         # Redis и in-memory хранилища
+├── config/        # системы-потребители и rate limiting
+├── metrics/       # Micrometer-метрики
+├── security/      # безопасное представление данных в логах
+└── exception/     # единый формат ошибок
+```
+
+Подробное устройство и ограничения: [docs/architecture.md](docs/architecture.md).
