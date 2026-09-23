@@ -156,6 +156,26 @@ class MyDetector : Detector {
 
 Ключевые метрики: `pii_requests_total`, `pii_requests_masking_total`, `pii_requests_unmasking_total`, `pii_latency_seconds`, `pii_entities_detected_total`, `pii_rate_limited_total`.
 
+### Локальный мониторинг (Prometheus + Grafana)
+
+Мониторинг запускается **локально** на машине разработчика и скрейпит метрики с удалённого сервера через интернет. На сервер ничего ставить не нужно.
+
+```bash
+docker compose -f docker-compose.monitoring.yml up -d
+```
+
+- **Grafana:** http://localhost:3000 (admin / admin)
+- **Prometheus:** http://localhost:9090
+
+Дашборд **«PII Security Module — Overview»** (папка `PII`) показывает:
+- RPS (всего / маскирование / демаскирование)
+- Latency p50/p95/p99 (общая и по направлениям)
+- Количество запросов и ошибок
+- Типы обнаруженных ПД (17 категорий)
+- Rate limited (429) и error rate
+
+> Конфиги мониторинга (`docker-compose.monitoring.yml`, `monitoring/`) не заливаются на гит — они локальные (см. `.gitignore`).
+
 ## Производительность
 
 Результаты нагрузочного теста (`load_test.py`, 100 000 запросов, 100 параллельно):

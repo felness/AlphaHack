@@ -89,6 +89,7 @@ class ProcessService(
      * Маскирование: первый запрос с новым payload_id.
      */
     private fun mask(payload: String, payloadId: String, system: SystemConfig, systemId: String): ProcessResponse {
+        val start = System.nanoTime()
         val maskedId = logMasker.maskPayloadId(payloadId)
         log.debug("Masking request, payloadId={}", maskedId)
 
@@ -116,6 +117,7 @@ class ProcessService(
         correlationStore.save(payloadId, record)
 
         metricsService.recordMasking()
+        metricsService.recordMaskingLatency(System.nanoTime() - start)
         return ProcessResponse(maskingResult.maskedText)
     }
 
@@ -123,6 +125,7 @@ class ProcessService(
      * Демаскирование: второй запрос с тем же payload_id.
      */
     private fun unmask(payload: String, payloadId: String, record: CorrelationRecord, system: SystemConfig, systemId: String): ProcessResponse {
+        val start = System.nanoTime()
         log.debug("Unmasking request, payloadId={}", logMasker.maskPayloadId(payloadId))
 
         // Если демаскирование отключено для системы — запретить
@@ -139,6 +142,7 @@ class ProcessService(
         val original = unmaskingEngine.unmask(payload, record.spans)
 
         metricsService.recordUnmasking()
+        metricsService.recordUnmaskingLatency(System.nanoTime() - start)
         return ProcessResponse(original)
     }
 }

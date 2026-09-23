@@ -109,3 +109,22 @@ sudo ufw enable
 - `SPRING_DATA_REDIS_PORT` — порт Redis (по умолчанию `6379`)
 - `PII_STORE_TYPE` — тип хранилища (`redis`)
 - `SERVER_PORT` — порт приложения (по умолчанию `8080`)
+
+## 8. Локальный мониторинг (Prometheus + Grafana)
+
+Мониторинг запускается **локально** на машине разработчика и скрейпит метрики
+с удалённого сервера через интернет. На сервер ничего ставить не нужно.
+
+```bash
+# На локальной машине (в корне репозитория)
+docker compose -f docker-compose.monitoring.yml up -d
+```
+
+- **Grafana:** http://localhost:3000 (admin / admin)
+- **Prometheus:** http://localhost:9090
+
+Дашборд **«PII Security Module — Overview»** (папка `PII`) показывает RPS, latency
+(p50/p95/p99), количество запросов/ошибок и типы обнаруженных ПД.
+
+> Конфиги мониторинга (`docker-compose.monitoring.yml`, `monitoring/`) не заливаются
+> на гит — они локальные (см. `.gitignore`).

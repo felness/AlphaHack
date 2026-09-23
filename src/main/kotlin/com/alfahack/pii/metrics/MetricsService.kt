@@ -39,6 +39,21 @@ class MetricsService(
     private val latency: Timer = Timer.builder("pii_latency_seconds")
         .description("Request latency")
         .publishPercentiles(0.5, 0.95, 0.99)
+        // Публикуем histogram buckets для точных перцентилей по времени
+        // (histogram_quantile в Prometheus/Grafana)
+        .publishPercentileHistogram(true)
+        .register(meterRegistry)
+
+    private val maskingLatency: Timer = Timer.builder("pii_latency_masking_seconds")
+        .description("Masking latency")
+        .publishPercentiles(0.5, 0.95, 0.99)
+        .publishPercentileHistogram(true)
+        .register(meterRegistry)
+
+    private val unmaskingLatency: Timer = Timer.builder("pii_latency_unmasking_seconds")
+        .description("Unmasking latency")
+        .publishPercentiles(0.5, 0.95, 0.99)
+        .publishPercentileHistogram(true)
         .register(meterRegistry)
 
     private val rateLimitedTotal: Counter = Counter.builder("pii_rate_limited_total")
@@ -80,6 +95,14 @@ class MetricsService(
 
     fun recordLatency(durationNanos: Long) {
         latency.record(durationNanos, TimeUnit.NANOSECONDS)
+    }
+
+    fun recordMaskingLatency(durationNanos: Long) {
+        maskingLatency.record(durationNanos, TimeUnit.NANOSECONDS)
+    }
+
+    fun recordUnmaskingLatency(durationNanos: Long) {
+        unmaskingLatency.record(durationNanos, TimeUnit.NANOSECONDS)
     }
 
     fun recordEntityDetected(type: PiiType) {

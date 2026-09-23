@@ -45,3 +45,8 @@ rule.md
 
 ### Скиллы ALFAGEN (внутренние, не входят в решение) ###
 docs/skills/
+
+### Локальный мониторинг (Prometheus + Grafana) ###
+# Не заливаем на гит: конфиги содержат локальные пути и адреса
+docker-compose.monitoring.yml
+monitoring/
