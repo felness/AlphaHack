@@ -7,7 +7,9 @@ FROM gradle:jdk21 AS builder
 WORKDIR /app
 
 # Копируем build-файлы для кэширования зависимостей
+# (включая version catalog gradle/libs.versions.toml, используемый в build.gradle.kts)
 COPY build.gradle.kts settings.gradle.kts ./
+COPY gradle ./gradle
 
 # Скачиваем зависимости (кэшируемый слой)
 RUN gradle dependencies --no-daemon || true
