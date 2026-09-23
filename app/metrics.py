@@ -1,93 +1,139 @@
 """Метрики производительности: latency, RPS, TPS.
 
-Лёгкие in-memory счётчики, экспортируемые через /metrics в Prometheus-формате.
+Хранятся в Redis (общее хранилище для всех воркеров), чтобы метрики
+отражали реальную нагрузку на весь сервис, а не на один воркер.
 """
 from __future__ import annotations
 
-import threading
+import logging
+import os
 import time
-from collections import deque
+
+import redis
+
+logger = logging.getLogger("pii.metrics")
+
+# Ключи Redis
+_TOTAL_REQUESTS = "metrics:total_requests"
+_TOTAL_ERRORS = "metrics:total_errors"
+_TOTAL_TOKENS = "metrics:total_tokens"
+_RPS_WINDOW = "metrics:rps_window"      # ZSET: timestamp -> worker_id
+_TPS_WINDOW = "metrics:tps_window"      # ZSET: timestamp -> tokens
+_LATENCY_SUM = "metrics:latency_sum"    # сумма latency (мс)
+_LATENCY_COUNT = "metrics:latency_count"
+_LATENCY_P95 = "metrics:latency_p95"    # ZSET: latency -> worker_id
 
 
 class Metrics:
-    """Сбор метрик latency/RPS/TPS."""
+    """Сбор метрик latency/RPS/TPS в Redis (общий для всех воркеров)."""
 
     def __init__(self, window_sec: float = 60.0):
         self._window = window_sec
-        self._lock = threading.Lock()
-        self._requests: deque[float] = deque()      # timestamps запросов
-        self._tokens: deque[tuple[float, int]] = deque()  # (timestamp, tokens)
-        self._latencies: deque[float] = deque()     # latency каждого запроса
-        self._total_requests = 0
-        self._total_errors = 0
-        self._total_tokens = 0
+        self._redis = redis.Redis(
+            host=os.getenv("REDIS_HOST", "redis"),
+            port=int(os.getenv("REDIS_PORT", "6379")),
+            decode_responses=True,
+            socket_connect_timeout=1.0,
+            socket_timeout=2.0,
+            health_check_interval=30,
+            retry_on_timeout=True,
+        )
 
     def record_request(self, latency_sec: float, tokens: int = 0, error: bool = False) -> None:
-        now = time.monotonic()
-        with self._lock:
-            self._requests.append(now)
-            self._latencies.append(latency_sec)
-            self._total_requests += 1
+        """Записывает метрику запроса в Redis."""
+        now = time.time()
+        try:
+            pipe = self._redis.pipeline()
+            pipe.incr(_TOTAL_REQUESTS)
             if error:
-                self._total_errors += 1
+                pipe.incr(_TOTAL_ERRORS)
             if tokens > 0:
-                self._tokens.append((now, tokens))
-                self._total_tokens += tokens
+                pipe.incrby(_TOTAL_TOKENS, tokens)
+                pipe.zadd(_TPS_WINDOW, {str(now): tokens})
+            pipe.zadd(_RPS_WINDOW, {str(now): 1})
+            latency_ms = latency_sec * 1000
+            pipe.incrbyfloat(_LATENCY_SUM, latency_ms)
+            pipe.incr(_LATENCY_COUNT)
+            pipe.zadd(_LATENCY_P95, {str(now): latency_ms})
+            # Ограничиваем размер ZSET для p95 (храним последние 10000)
+            pipe.zremrangebyrank(_LATENCY_P95, 0, -10001)
+            pipe.execute()
             self._prune(now)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Не удалось записать метрику в Redis: %s", exc)
 
     def _prune(self, now: float) -> None:
+        """Удаляет устаревшие записи из окон."""
         cutoff = now - self._window
-        while self._requests and self._requests[0] < cutoff:
-            self._requests.popleft()
-        while self._latencies and len(self._latencies) > len(self._requests):
-            self._latencies.popleft()
-        while self._tokens and self._tokens[0][0] < cutoff:
-            self._tokens.popleft()
+        try:
+            pipe = self._redis.pipeline()
+            pipe.zremrangebyscore(_RPS_WINDOW, 0, cutoff)
+            pipe.zremrangebyscore(_TPS_WINDOW, 0, cutoff)
+            pipe.execute()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Не удалось очистить окна метрик: %s", exc)
 
     def rps(self) -> float:
-        now = time.monotonic()
-        with self._lock:
-            self._prune(now)
-            return len(self._requests) / self._window
-
-    def avg_latency_ms(self) -> float:
-        with self._lock:
-            if not self._latencies:
-                return 0.0
-            return (sum(self._latencies) / len(self._latencies)) * 1000
-
-    def p95_latency_ms(self) -> float:
-        with self._lock:
-            if not self._latencies:
-                return 0.0
-            # Частичная сортировка для p95 (быстрее полной сортировки)
-            k = max(1, int(len(self._latencies) * 0.95))
-            kth = self._nth_smallest(list(self._latencies), k)
-            return kth * 1000
-
-    @staticmethod
-    def _nth_smallest(values: list[float], k: int) -> float:
-        """Возвращает k-й наименьший элемент (1-indexed) без полной сортировки."""
-        values.sort()
-        return values[min(k - 1, len(values) - 1)]
+        """Запросов в секунду за окно."""
+        try:
+            count = self._redis.zcard(_RPS_WINDOW)
+            return count / self._window
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Не удалось получить RPS: %s", exc)
+            return 0.0
 
     def tps(self) -> float:
-        now = time.monotonic()
-        with self._lock:
-            self._prune(now)
-            return sum(t for _, t in self._tokens) / self._window
+        """Токенов в секунду за окно."""
+        try:
+            total = sum(float(v) for v in self._redis.zrange(_TPS_WINDOW, 0, -1, withscores=True))
+            return total / self._window
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Не удалось получить TPS: %s", exc)
+            return 0.0
+
+    def avg_latency_ms(self) -> float:
+        """Средняя latency в мс."""
+        try:
+            total = float(self._redis.get(_LATENCY_SUM) or 0)
+            count = int(self._redis.get(_LATENCY_COUNT) or 0)
+            return total / count if count else 0.0
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Не удалось получить avg latency: %s", exc)
+            return 0.0
+
+    def p95_latency_ms(self) -> float:
+        """P95 latency в мс."""
+        try:
+            values = [float(v) for v in self._redis.zrange(_LATENCY_P95, 0, -1, withscores=True)]
+            if not values:
+                return 0.0
+            values.sort()
+            idx = int(len(values) * 0.95)
+            return values[min(idx, len(values) - 1)]
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Не удалось получить p95 latency: %s", exc)
+            return 0.0
 
     def total_requests(self) -> int:
-        with self._lock:
-            return self._total_requests
+        try:
+            return int(self._redis.get(_TOTAL_REQUESTS) or 0)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Не удалось получить total_requests: %s", exc)
+            return 0
 
     def total_errors(self) -> int:
-        with self._lock:
-            return self._total_errors
+        try:
+            return int(self._redis.get(_TOTAL_ERRORS) or 0)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Не удалось получить total_errors: %s", exc)
+            return 0
 
     def total_tokens(self) -> int:
-        with self._lock:
-            return self._total_tokens
+        try:
+            return int(self._redis.get(_TOTAL_TOKENS) or 0)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Не удалось получить total_tokens: %s", exc)
+            return 0
 
     def render_prometheus(self) -> str:
         """Возвращает метрики в Prometheus text-формате."""
