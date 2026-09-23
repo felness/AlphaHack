@@ -81,3 +81,26 @@ jobs:
               ghcr.io/${{ github.repository_owner }}/alphahack:latest
             sleep 5
             curl -sf http://localhost:8000/health && echo "DEPLOY OK" || echo "DEPLOY FAILED"
+
+      - name: Deploy monitoring (Prometheus + Grafana)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ vars.VM_HOST }}
+          username: ${{ vars.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: "monitoring,docker-compose.monitoring.yml"
+          target: "~/pii-monitoring"
+
+      - name: Start monitoring on VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.VM_HOST }}
+          username: ${{ vars.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            cd ~/pii-monitoring
+            docker network create pii-net 2>/dev/null || true
+            docker compose -f docker-compose.monitoring.yml up -d
+            sleep 10
+            curl -sf http://localhost:9090/-/healthy && echo "PROMETHEUS OK" || echo "PROMETHEUS FAILED"
+            curl -sf http://localhost:3000/api/health && echo "GRAFANA OK" || echo "GRAFANA FAILED"
