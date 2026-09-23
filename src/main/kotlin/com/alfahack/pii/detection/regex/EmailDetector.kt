@@ -17,7 +17,7 @@ class EmailDetector : Detector {
     private val pattern: Pattern =
         Pattern.compile(
             EMAIL_REGEX,
-            Pattern.CASE_INSENSITIVE,
+            Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CHARACTER_CLASS,
         )
 
     override fun detect(text: String): List<DetectedEntity> {
@@ -41,8 +41,9 @@ class EmailDetector : Detector {
     }
 
     companion object {
-        // Стандартный regex для email
+        // Email: локальная часть @ домен . TLD.
+        // Классы Unicode-aware (\p{Alnum} при UNICODE_CHARACTER_CLASS) — поддержка IDN-адресов.
         private const val EMAIL_REGEX =
-            "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+            "[\\p{Alnum}._%+-]+@[\\p{Alnum}.-]+\\.\\p{Alpha}{2,}"
     }
 }

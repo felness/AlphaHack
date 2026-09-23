@@ -40,6 +40,11 @@ management:
   endpoint:
     health:
       show-details: always
+  health:
+    # Redis — вспомогательный компонент: при его недоступности сервис продолжает
+    # отвечать (circuit breaker + in-memory), поэтому health не должен падать в DOWN
+    redis:
+      enabled: ${REDIS_HEALTH_ENABLED:false}
   metrics:
     tags:
       application: ${spring.application.name}
@@ -47,8 +52,10 @@ management:
 # Логирование
 logging:
   level:
-    com.alfahack.pii: DEBUG
-    root: INFO
+    # DEBUG пишет 3 строки на запрос — под нагрузкой это бьёт по p99.
+    # Уровень задаётся переменной окружения, по умолчанию INFO.
+    com.alfahack.pii: ${PII_LOG_LEVEL:INFO}
+    root: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
 

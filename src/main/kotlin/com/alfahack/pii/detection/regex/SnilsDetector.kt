@@ -17,7 +17,7 @@ import java.util.regex.Pattern
 class SnilsDetector : Detector {
     override val supportedTypes: Set<PiiType> = setOf(PiiType.SNILS)
 
-    private val pattern: Pattern = Pattern.compile(SNILS_REGEX)
+    private val pattern: Pattern = Pattern.compile(SNILS_REGEX, Pattern.UNICODE_CHARACTER_CLASS)
 
     override fun detect(text: String): List<DetectedEntity> {
         val matcher = pattern.matcher(text)

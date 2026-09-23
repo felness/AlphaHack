@@ -77,28 +77,39 @@ class MaskingEngine {
         format: MaskFormat,
     ): String =
         when (format) {
-            MaskFormat.STAR -> {
-                value.map { ch -> if (ch.isLetterOrDigit()) '*' else ch }.joinToString("")
-            }
+            MaskFormat.STAR -> replaceAlphanumeric(value, STAR)
 
-            MaskFormat.TOKEN -> {
-                value.map { ch -> if (ch.isLetterOrDigit()) 'X' else ch }.joinToString("")
-            }
+            MaskFormat.TOKEN -> replaceAlphanumeric(value, TOKEN)
 
             // Синтетические данные: замена на случайные символы (сохраняя длину и разделители)
-            MaskFormat.SYNTHETIC -> {
-                value
-                    .map { ch ->
-                        when {
-                            ch.isDigit() -> ('0' + random.nextInt(10))
-                            ch.isLetter() -> ('а' + random.nextInt(32))
-                            else -> ch
-                        }
-                    }.joinToString("")
-            }
+            MaskFormat.SYNTHETIC -> value.map(::synthesizeChar).joinToString("")
+        }
+
+    /**
+     * Заменить буквы и цифры на [replacement], оставив разделители на месте.
+     */
+    private fun replaceAlphanumeric(
+        value: String,
+        replacement: Char,
+    ): String = value.map { ch -> if (ch.isLetterOrDigit()) replacement else ch }.joinToString("")
+
+    /**
+     * Подменить символ правдоподобным случайным того же класса.
+     */
+    private fun synthesizeChar(ch: Char): Char =
+        when {
+            ch.isDigit() -> '0' + random.nextInt(DIGITS)
+            ch.isLetter() -> 'а' + random.nextInt(CYRILLIC_LETTERS)
+            else -> ch
         }
 
     companion object {
-        private val random = java.util.Random()
+        private const val STAR = '*'
+        private const val TOKEN = 'X'
+        private const val DIGITS = 10
+        private const val CYRILLIC_LETTERS = 32
+
+        // Синтетика подменяет ПД, поэтому источник должен быть непредсказуемым
+        private val random = java.security.SecureRandom()
     }
 }

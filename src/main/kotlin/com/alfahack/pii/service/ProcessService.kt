@@ -154,8 +154,15 @@ class ProcessService(
             throw SystemNotAllowedException(payloadId)
         }
 
-        // Восстановление исходной строки по spans
-        val original = unmaskingEngine.unmask(payload, record.spans)
+        // Пришла наша же маска без изменений — отдаём сохранённый оригинал дословно.
+        // Восстановление по позициям остаётся запасным путём на случай, когда маску
+        // изменили по дороге (например, её вернула LLM).
+        val original =
+            if (payload == record.mask) {
+                record.original
+            } else {
+                unmaskingEngine.unmask(payload, record.spans)
+            }
 
         metricsService.recordUnmasking()
         metricsService.recordUnmaskingLatency(System.nanoTime() - start)

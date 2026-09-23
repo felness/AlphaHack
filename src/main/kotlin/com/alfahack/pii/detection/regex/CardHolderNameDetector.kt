@@ -17,7 +17,11 @@ import java.util.regex.Pattern
 class CardHolderNameDetector : Detector {
     override val supportedTypes: Set<PiiType> = setOf(PiiType.CARD_HOLDER_NAME)
 
-    private val pattern: Pattern = Pattern.compile(CARD_HOLDER_REGEX, Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CHARACTER_CLASS)
+    private val pattern: Pattern =
+        Pattern.compile(
+            CARD_HOLDER_REGEX,
+            Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CHARACTER_CLASS,
+        )
 
     override fun detect(text: String): List<DetectedEntity> {
         val matcher = pattern.matcher(text)
@@ -41,8 +45,14 @@ class CardHolderNameDetector : Detector {
     }
 
     companion object {
-        // Имя держателя: «card holder»/«cardholder» + 2 слова латиницей — группа 1 = имя
-        private const val CARD_HOLDER_REGEX =
-            "\\b(?:card\\s*holder|cardholder)\\s*[:\\s]+([A-Z]{2,}\\s+[A-Z]{2,})\\b"
+        // Служебные слова, после которых идёт имя держателя (рус. и англ.)
+        private const val TRIGGER =
+            "card\\s*holder|cardholder|держател\\p{IsCyrillic}+(?:\\s+карты)?|имя\\s+на\\s+карте"
+
+        // Имя латиницей: 2-3 слова (\p{IsLatin} — Unicode-aware, только латиница)
+        private const val LATIN_NAME = "\\p{IsLatin}{2,}(?:\\s+\\p{IsLatin}{2,}){1,2}"
+
+        // Группа 1 = имя; служебное слово в span не попадает и остаётся читаемым
+        private const val CARD_HOLDER_REGEX = "\\b(?:$TRIGGER)[\\s:]+($LATIN_NAME)"
     }
 }

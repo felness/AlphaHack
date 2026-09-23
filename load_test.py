@@ -13,7 +13,7 @@ RPS и проверяет качество (roundtrip, точность маск
 
 import argparse
 import json
-import random
+import secrets
 import statistics
 import sys
 import time
@@ -28,6 +28,9 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
 # ---------------------------------------------------------------------------
 # Генерация реалистичных данных по 17 категориям ПД
 # ---------------------------------------------------------------------------
+
+# Тот же API, что у модуля random (choice/randint), но криптостойкий источник
+_rng = secrets.SystemRandom()
 
 FIRST_NAMES = ["Иван", "Петр", "Сергей", "Алексей", "Дмитрий", "Андрей", "Николай", "Михаил"]
 LAST_NAMES = ["Иванов", "Петров", "Сидоров", "Смирнов", "Кузнецов", "Попов", "Соколов", "Лебедев"]
@@ -51,8 +54,8 @@ def luhn_checksum(number: str) -> int:
 
 def valid_card() -> str:
     """Сгенерировать Luhn-валидный номер карты."""
-    prefix = random.choice(CARD_PREFIXES)
-    body = "".join(str(random.randint(0, 9)) for _ in range(11))
+    prefix = _rng.choice(CARD_PREFIXES)
+    body = "".join(str(_rng.randint(0, 9)) for _ in range(11))
     base = prefix + body
     check = luhn_checksum(base)
     return f"{base}{check}"
@@ -61,7 +64,7 @@ def valid_card() -> str:
 def valid_inn_10() -> str:
     """Сгенерировать валидный 10-значный ИНН."""
     weights = [2, 4, 10, 3, 5, 9, 4, 6, 8]
-    base = "77" + "".join(str(random.randint(0, 9)) for _ in range(7))
+    base = "77" + "".join(str(_rng.randint(0, 9)) for _ in range(7))
     total = sum(int(base[i]) * weights[i] for i in range(9))
     check = total % 11 % 10
     return base + str(check)
@@ -71,7 +74,7 @@ def valid_inn_12() -> str:
     """Сгенерировать валидный 12-значный ИНН."""
     w1 = [7, 2, 4, 10, 3, 5, 9, 4, 6, 8]
     w2 = [3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8]
-    base = "77" + "".join(str(random.randint(0, 9)) for _ in range(8))
+    base = "77" + "".join(str(_rng.randint(0, 9)) for _ in range(8))
     c1 = sum(int(base[i]) * w1[i] for i in range(10)) % 11 % 10
     c2 = sum(int((base + str(c1))[i]) * w2[i] for i in range(11)) % 11 % 10
     return base + str(c1) + str(c2)
@@ -80,45 +83,45 @@ def valid_inn_12() -> str:
 def random_phone() -> str:
     """Сгенерировать телефон."""
     formats = [
-        f"+7 ({random.randint(900, 999)}) {random.randint(100, 999)}-{random.randint(10, 99)}-{random.randint(10, 99)}",
-        f"8{random.randint(900, 999)}{random.randint(1000000, 9999999)}",
-        f"8-{random.randint(900, 999)}-{random.randint(100, 999)}-{random.randint(10, 99)}-{random.randint(10, 99)}",
+        f"+7 ({_rng.randint(900, 999)}) {_rng.randint(100, 999)}-{_rng.randint(10, 99)}-{_rng.randint(10, 99)}",
+        f"8{_rng.randint(900, 999)}{_rng.randint(1000000, 9999999)}",
+        f"8-{_rng.randint(900, 999)}-{_rng.randint(100, 999)}-{_rng.randint(10, 99)}-{_rng.randint(10, 99)}",
     ]
-    return random.choice(formats)
+    return _rng.choice(formats)
 
 
 def random_email() -> str:
     """Сгенерировать email."""
-    name = random.choice(LAST_NAMES).lower() + str(random.randint(1, 999))
-    return f"{name}@{random.choice(EMAIL_DOMAINS)}"
+    name = _rng.choice(LAST_NAMES).lower() + str(_rng.randint(1, 999))
+    return f"{name}@{_rng.choice(EMAIL_DOMAINS)}"
 
 
 def random_passport() -> str:
     """Сгенерировать паспорт."""
-    series = f"{random.randint(1000, 9999)}"
-    number = f"{random.randint(100000, 999999)}"
+    series = f"{_rng.randint(1000, 9999)}"
+    number = f"{_rng.randint(100000, 999999)}"
     return f"{series} {number}"
 
 
 def random_date() -> str:
     """Сгенерировать дату."""
-    day = random.randint(1, 28)
-    month = random.randint(1, 12)
-    year = random.randint(1950, 2005)
+    day = _rng.randint(1, 28)
+    month = _rng.randint(1, 12)
+    year = _rng.randint(1950, 2005)
     return f"{day:02d}.{month:02d}.{year}"
 
 
 def random_full_name() -> str:
     """Сгенерировать ФИО."""
-    return f"{random.choice(LAST_NAMES)} {random.choice(FIRST_NAMES)} {random.choice(PATRONYMICS)}"
+    return f"{_rng.choice(LAST_NAMES)} {_rng.choice(FIRST_NAMES)} {_rng.choice(PATRONYMICS)}"
 
 
 def random_address() -> str:
     """Сгенерировать адрес."""
-    city = random.choice(CITIES)
-    street = random.choice(STREETS)
-    house = random.randint(1, 200)
-    apt = random.randint(1, 500)
+    city = _rng.choice(CITIES)
+    street = _rng.choice(STREETS)
+    house = _rng.randint(1, 200)
+    apt = _rng.randint(1, 500)
     return f"г. {city}, ул. {street}, д. {house}, кв. {apt}"
 
 
@@ -129,14 +132,14 @@ def generate_payload() -> str:
         f"email {random_email()}, телефон {random_phone()}",
         f"ИНН {valid_inn_12()}, карта {valid_card()}",
         f"паспорт {random_passport()}, адрес: {random_address()}",
-        f"гражданин РФ, место рождения: г. {random.choice(CITIES)}",
+        f"гражданин РФ, место рождения: г. {_rng.choice(CITIES)}",
         f"телефон {random_phone()}, email {random_email()}, ИНН {valid_inn_10()}",
-        f"карта {valid_card()}, CVV {random.randint(100, 999)}, ПИН-код {random.randint(1000, 9999)}",
-        f"паспорт {random_passport()}, код подразделения {random.randint(100, 999)}-{random.randint(100, 999)}",
-        f"водительское удостоверение {random.randint(10, 99)} {random.randint(10, 99)} {random.randint(100000, 999999)}",
+        f"карта {valid_card()}, CVV {_rng.randint(100, 999)}, ПИН-код {_rng.randint(1000, 9999)}",
+        f"паспорт {random_passport()}, код подразделения {_rng.randint(100, 999)}-{_rng.randint(100, 999)}",
+        f"водительское удостоверение {_rng.randint(10, 99)} {_rng.randint(10, 99)} {_rng.randint(100000, 999999)}",
         f"дата рождения {random_date()}, телефон {random_phone()}, email {random_email()}",
     ]
-    return random.choice(templates)
+    return _rng.choice(templates)
 
 
 # ---------------------------------------------------------------------------

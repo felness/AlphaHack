@@ -29,12 +29,13 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
-    // Отказоустойчивость: circuit breaker (Resilience4j) + rate limiting (Bucket4j)
-    implementation("io.github.resilience4j:resilience4j-spring-boot3:2.4.0")
-    implementation("com.bucket4j:bucket4j-core:8.10.1")
+    // Отказоустойчивость: circuit breaker (Resilience4j) + rate limiting (Bucket4j).
+    // Версии — в gradle/libs.versions.toml
+    implementation(libs.resilience4j.spring.boot3)
+    implementation(libs.bucket4j.core)
 
     // Перезагрузка конфигурации без рестарта (@RefreshScope)
-    implementation("org.springframework.cloud:spring-cloud-context:4.2.4")
+    implementation(libs.spring.cloud.context)
 
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 

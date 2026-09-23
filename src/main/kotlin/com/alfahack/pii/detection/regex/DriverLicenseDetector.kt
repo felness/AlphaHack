@@ -20,7 +20,7 @@ import java.util.regex.Pattern
 class DriverLicenseDetector : Detector {
     override val supportedTypes: Set<PiiType> = setOf(PiiType.DRIVER_LICENSE)
 
-    private val pattern: Pattern = Pattern.compile(DRIVER_LICENSE_REGEX)
+    private val pattern: Pattern = Pattern.compile(DRIVER_LICENSE_REGEX, Pattern.UNICODE_CHARACTER_CLASS)
 
     override fun detect(text: String): List<DetectedEntity> {
         val matcher = pattern.matcher(text)

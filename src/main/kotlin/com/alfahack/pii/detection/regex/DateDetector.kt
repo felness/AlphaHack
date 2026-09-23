@@ -11,10 +11,16 @@ import java.util.regex.Pattern
  * Детектор дат (дата рождения, дата выдачи паспорта).
  *
  * Поддерживает форматы:
- * - Числовые: дд.мм.гггг, мм.дд.гггг, гггг-мм-дд, дд/мм/гггг, дд-мм-гггг
- * - Текстовые: «двенадцатого мая 1990 года», «12 мая 1990»
+ * - Числовые с днём впереди: дд.мм.гггг, мм.дд.гггг, дд/мм/гггг, дд-мм-гггг
+ * - Числовые с годом впереди: гггг.мм.дд, гггг-мм-дд, гггг/мм/дд
+ * - Месяц словом: «12 мая 1990», «12 янв. 1990»
+ * - Полностью текстовые: «двенадцатого мая 1990 года», «двенадцатого марта
+ *   тысяча девятьсот девяностого года»
  *
- * Различает тип по контексту: «дата рождения» → DATE_OF_BIRTH,
+ * Шаблоны собираются из словарей во время выполнения — так их можно читать
+ * и дополнять, не редактируя одну гигантскую строку.
+ *
+ * Тип определяется по контексту: «дата рождения» → DATE_OF_BIRTH,
  * «дата выдачи»/«выдан» → PASSPORT_ISSUE_DATE.
  */
 @Component
@@ -25,39 +31,36 @@ class DateDetector : Detector {
             PiiType.PASSPORT_ISSUE_DATE,
         )
 
-    // Формат дд.мм.гггг / мм.дд.гггг / дд/мм/гггг / дд-мм-гггг
-    private val dayFirstPattern: Pattern = Pattern.compile(DAY_FIRST_REGEX)
+    /** Месяц словом: полная форма или сокращение с необязательной точкой. */
+    private val monthAlternation: String =
+        (FULL_MONTHS + SHORT_MONTHS.map { "$it\\.?" }).joinToString("|")
 
-    // Формат гггг-мм-дд (год в начале)
-    private val yearFirstPattern: Pattern = Pattern.compile(YEAR_FIRST_REGEX)
+    /** День словом: «первого» … «тридцать первого». */
+    private val dayWordAlternation: String = DAY_WORDS.joinToString("|")
 
-    // Текстовый формат: «12 мая 1990» (число + месяц + год)
-    private val textNumericPattern: Pattern = Pattern.compile(TEXT_NUMERIC_REGEX, Pattern.UNICODE_CHARACTER_CLASS)
+    /** Год: четыре цифры либо прописью («тысяча девятьсот девяностого»). */
+    private val yearAlternation: String = "\\d{4}|тысяча(?:\\s+\\p{IsCyrillic}+){1,3}"
 
-    // Текстовый формат: «двенадцатого мая 1990 года» (числительное + месяц + год)
-    private val textWordPattern: Pattern = Pattern.compile(TEXT_WORD_REGEX, Pattern.UNICODE_CHARACTER_CLASS)
+    private val patterns: List<Pattern> =
+        listOf(
+            // дд.мм.гггг, мм.дд.гггг, дд/мм/гггг, дд-мм-гггг
+            "\\b\\d{1,2}[./-]\\d{1,2}[./-]\\d{4}\\b",
+            // гггг.мм.дд, гггг-мм-дд, гггг/мм/дд
+            "\\b\\d{4}[./-]\\d{1,2}[./-]\\d{1,2}\\b",
+            // 12 мая 1990, 12 янв. 1990
+            "\\b\\d{1,2}\\s+(?:$monthAlternation)\\s+\\d{4}\\b",
+            // двенадцатого мая 1990, двенадцатого марта тысяча девятьсот девяностого
+            "\\b(?:$dayWordAlternation)\\s+(?:$monthAlternation)\\s+(?:$yearAlternation)",
+        ).map { Pattern.compile(it, Pattern.UNICODE_CHARACTER_CLASS) }
 
     override fun detect(text: String): List<DetectedEntity> {
         val result = mutableListOf<DetectedEntity>()
 
-        val dayFirstMatcher = dayFirstPattern.matcher(text)
-        while (dayFirstMatcher.find()) {
-            result.add(buildEntity(text, dayFirstMatcher.start(), dayFirstMatcher.end()))
-        }
-
-        val yearFirstMatcher = yearFirstPattern.matcher(text)
-        while (yearFirstMatcher.find()) {
-            result.add(buildEntity(text, yearFirstMatcher.start(), yearFirstMatcher.end()))
-        }
-
-        val textNumericMatcher = textNumericPattern.matcher(text)
-        while (textNumericMatcher.find()) {
-            result.add(buildEntity(text, textNumericMatcher.start(), textNumericMatcher.end()))
-        }
-
-        val textWordMatcher = textWordPattern.matcher(text)
-        while (textWordMatcher.find()) {
-            result.add(buildEntity(text, textWordMatcher.start(), textWordMatcher.end()))
+        for (pattern in patterns) {
+            val matcher = pattern.matcher(text)
+            while (matcher.find()) {
+                result.add(buildEntity(text, matcher.start(), matcher.end()))
+            }
         }
 
         return result
@@ -67,17 +70,15 @@ class DateDetector : Detector {
         text: String,
         start: Int,
         end: Int,
-    ): DetectedEntity {
-        val type = resolveType(text, start, end)
-        return DetectedEntity(
-            type = type,
+    ): DetectedEntity =
+        DetectedEntity(
+            type = resolveType(text, start, end),
             start = start,
             end = end,
             confidence = 0.85,
             source = DetectorSource.REGEX,
             validated = true,
         )
-    }
 
     /**
      * Определить тип даты по контексту.
@@ -101,23 +102,81 @@ class DateDetector : Detector {
     companion object {
         private const val CONTEXT_WINDOW = 30
 
-        // Даты: дд.мм.гггг, мм.дд.гггг, дд/мм/гггг, дд-мм-гггг
-        private const val DAY_FIRST_REGEX =
-            "\\b\\d{1,2}[./-]\\d{1,2}[./-]\\d{4}\\b"
+        /** Месяцы в родительном падеже — как их пишут в датах. */
+        private val FULL_MONTHS =
+            listOf(
+                "января",
+                "февраля",
+                "марта",
+                "апреля",
+                "мая",
+                "июня",
+                "июля",
+                "августа",
+                "сентября",
+                "октября",
+                "ноября",
+                "декабря",
+            )
 
-        // Даты: гггг-мм-дд (год в начале)
-        private const val YEAR_FIRST_REGEX =
-            "\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b"
+        /** Сокращения месяцев. Длинные раньше коротких: иначе «сен» перекроет «сент». */
+        private val SHORT_MONTHS =
+            listOf(
+                "янв",
+                "февр",
+                "фев",
+                "мар",
+                "апр",
+                "июн",
+                "июл",
+                "авг",
+                "сент",
+                "сен",
+                "окт",
+                "нояб",
+                "ноя",
+                "дек",
+            )
 
-        // Текстовый формат: «12 мая 1990» (число + месяц + год)
-        private const val TEXT_NUMERIC_REGEX =
-            "\\b\\d{1,2}\\s+(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)\\s+\\d{4}\\b"
+        /** Числительные-дни. Составные раньше простых: иначе «двадцать первого» распадётся. */
+        private val DAY_WORDS =
+            listOf(
+                "двадцать первого",
+                "двадцать второго",
+                "двадцать третьего",
+                "двадцать четвертого",
+                "двадцать четвёртого",
+                "двадцать пятого",
+                "двадцать шестого",
+                "двадцать седьмого",
+                "двадцать восьмого",
+                "двадцать девятого",
+                "тридцать первого",
+                "тридцатого",
+                "одиннадцатого",
+                "двенадцатого",
+                "тринадцатого",
+                "четырнадцатого",
+                "пятнадцатого",
+                "шестнадцатого",
+                "семнадцатого",
+                "восемнадцатого",
+                "девятнадцатого",
+                "двадцатого",
+                "первого",
+                "второго",
+                "третьего",
+                "четвертого",
+                "четвёртого",
+                "пятого",
+                "шестого",
+                "седьмого",
+                "восьмого",
+                "девятого",
+                "десятого",
+            ).map { it.replace(" ", "\\s+") }
 
-        // Текстовый формат: «двенадцатого мая 1990 года» (числительное + месяц + год, «года» не входит в span)
-        private const val TEXT_WORD_REGEX =
-            "\\b(?:первого|второго|третьего|четвертого|четвёртого|пятого|шестого|седьмого|восьмого|девятого|десятого|одиннадцатого|двенадцатого|тринадцатого|четырнадцатого|пятнадцатого|шестнадцатого|семнадцатого|восемнадцатого|девятнадцатого|двадцатого|двадцать\\s+первого|двадцать\\s+второго|двадцать\\s+третьего|двадцать\\s+четвертого|двадцать\\s+четвёртого|двадцать\\s+пятого|двадцать\\s+шестого|двадцать\\s+седьмого|двадцать\\s+восьмого|двадцать\\s+девятого|тридцатого|тридцать\\s+первого)\\s+(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)\\s+\\d{4}(?=\\s+года)\\b"
-
-        // Ключевые слова даты выдачи паспорта
+        /** Ключевые слова даты выдачи паспорта. */
         private val ISSUE_DATE_KEYWORDS =
             listOf(
                 "дата выдачи",

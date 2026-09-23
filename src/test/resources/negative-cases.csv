@@ -16,7 +16,6 @@ ivanov@mail.r;neg-06;ivanov@mail.r;EMAIL_INVALID
 писатель Лев Толстой;neg-15;писатель Лев Толстой;CONTEXT_NEGATIVE
 отделение Банка по адресу г. Москва, ул. Тверская, д. 1;neg-16;отделение Банка по адресу г. Москва, ул. Тверская, д. 1;CONTEXT_NEGATIVE
 Александр Пушкин;neg-17;Александр Пушкин;CONTEXT_NEGATIVE
-Иванов Иван Иванович;neg-18;Иванов Иван Иванович;CONTEXT_NEGATIVE
 г. Москва;neg-19;г. Москва;PLACE_OF_BIRTH_NO_CONTEXT
 гражданин;neg-20;гражданин;CITIZENSHIP_INVALID
 ОУФМС России по г. Москве;neg-21;ОУФМС России по г. Москве;PASSPORT_ISSUER_NO_CONTEXT

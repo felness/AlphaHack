@@ -14,7 +14,7 @@ import java.util.regex.Pattern
 class PhoneDetector : Detector {
     override val supportedTypes: Set<PiiType> = setOf(PiiType.PHONE)
 
-    private val pattern: Pattern = Pattern.compile(PHONE_REGEX)
+    private val pattern: Pattern = Pattern.compile(PHONE_REGEX, Pattern.UNICODE_CHARACTER_CLASS)
 
     override fun detect(text: String): List<DetectedEntity> {
         val matcher = pattern.matcher(text)
@@ -37,9 +37,12 @@ class PhoneDetector : Detector {
     }
 
     companion object {
-        // Телефоны: +7 (900) 123-45-67, 8-900-123-45-67, 89001234567
-        // Границы слова \b с обеих сторон, чтобы не матчить часть более длинного числа
+        // Разделитель внутри номера: пробел или дефис (необязательный)
+        private const val SEP = "[\\s-]?"
+
+        // Телефоны: +7 (900) 123-45-67, 8-900-123-45-67, 89001234567.
+        // Границы слова \b с обеих сторон, чтобы не матчить часть более длинного числа.
         private const val PHONE_REGEX =
-            "\\b(?:(?:\\+?7|8)[\\s\\-]?(?:\\(?\\d{3}\\)?[\\s\\-]?)?\\d{3}[\\s\\-]?\\d{2}[\\s\\-]?\\d{2})\\b"
+            "\\b(?:\\+?7|8)$SEP\\(?\\d{3}\\)?$SEP\\d{3}$SEP\\d{2}$SEP\\d{2}\\b"
     }
 }

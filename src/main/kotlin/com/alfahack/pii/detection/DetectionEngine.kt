@@ -50,31 +50,53 @@ class DetectionEngine(
         val result = mutableListOf<DetectedEntity>()
 
         for (entity in sorted) {
-            // Удаляем все сущности, которые перекрываются с текущей
-            // (текущая приоритетнее, т.к. отсортирована первой при равном start)
-            val iterator = result.iterator()
-            var removed = false
-            while (iterator.hasNext()) {
-                val existing = iterator.next()
-                if (overlaps(existing, entity)) {
-                    // Если существующая приоритетнее — пропускаем текущую
-                    val existingPriority = TYPE_PRIORITY[existing.type] ?: 0
-                    val entityPriority = TYPE_PRIORITY[entity.type] ?: 0
-                    if (existingPriority > entityPriority ||
-                        (existingPriority == entityPriority && existing.confidence >= entity.confidence)
-                    ) {
-                        removed = true
-                        break
-                    }
-                    iterator.remove()
-                }
-            }
-            if (!removed) {
+            if (acceptOverPrevious(result, entity)) {
                 result.add(entity)
             }
         }
 
         return result
+    }
+
+    /**
+     * Освободить место под [entity], вытеснив перекрывающиеся сущности пониже приоритетом.
+     *
+     * @return true, если [entity] выиграла все пересечения и её можно добавить
+     */
+    private fun acceptOverPrevious(
+        accepted: MutableList<DetectedEntity>,
+        entity: DetectedEntity,
+    ): Boolean {
+        val iterator = accepted.iterator()
+
+        while (iterator.hasNext()) {
+            val existing = iterator.next()
+            if (!overlaps(existing, entity)) {
+                continue
+            }
+            if (winsOver(existing, entity)) {
+                return false
+            }
+            iterator.remove()
+        }
+
+        return true
+    }
+
+    /**
+     * Приоритетнее ли уже принятая сущность, чем кандидат.
+     */
+    private fun winsOver(
+        existing: DetectedEntity,
+        candidate: DetectedEntity,
+    ): Boolean {
+        val existingPriority = TYPE_PRIORITY[existing.type] ?: 0
+        val candidatePriority = TYPE_PRIORITY[candidate.type] ?: 0
+
+        if (existingPriority != candidatePriority) {
+            return existingPriority > candidatePriority
+        }
+        return existing.confidence >= candidate.confidence
     }
 
     private fun overlaps(

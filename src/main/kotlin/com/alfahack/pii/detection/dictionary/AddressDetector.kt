@@ -21,7 +21,28 @@ class AddressDetector(
 ) : Detector {
     override val supportedTypes: Set<PiiType> = setOf(PiiType.ADDRESS)
 
-    private val pattern: Pattern = Pattern.compile(ADDRESS_REGEX, Pattern.UNICODE_CHARACTER_CLASS)
+    /** Название с заглавной, допускает дефис: «Москва», «Санкт-Петербург». */
+    private val properName = "\\p{Lu}\\p{IsCyrillic}+(?:-\\p{IsCyrillic}+)*"
+
+    private val index = "\\d{6}"
+    private val city = "(?:${CITY_TYPES.joinToString("|")})\\s*$properName"
+    private val street = "(?:${STREET_TYPES.joinToString("|")})\\s*$properName"
+    private val house = "(?:д\\.|дом)\\s*\\d+\\p{IsCyrillic}?"
+    private val flat = "(?:кв\\.|квартира)\\s*\\d+"
+
+    /** Разделитель компонентов адреса: запятая и/или пробелы. */
+    private val separator = ",?\\s*"
+
+    /**
+     * Адрес: необязательный индекс, город, далее необязательные улица, дом, квартира.
+     * Собирается из компонентов, чтобы правила можно было читать и дополнять.
+     */
+    private val pattern: Pattern =
+        Pattern.compile(
+            "\\b(?:$index$separator)?$city" +
+                "(?:$separator$street)?(?:$separator$house)?(?:$separator$flat)?",
+            Pattern.UNICODE_CHARACTER_CLASS,
+        )
 
     override fun detect(text: String): List<DetectedEntity> {
         val matcher = pattern.matcher(text)
@@ -52,8 +73,26 @@ class AddressDetector(
     }
 
     companion object {
-        // Адрес: г. Город, ул. Улица, д. N, кв. N
-        private const val ADDRESS_REGEX =
-            "\\bг\\.\\s*[А-ЯЁ][а-яё-]+(?:,\\s*ул\\.\\s*[А-ЯЁ][а-яё-]+)?(?:,\\s*д\\.\\s*\\d+)?(?:,\\s*кв\\.\\s*\\d+)?\\b"
+        /** Обозначения населённого пункта. Длинные раньше коротких. */
+        private val CITY_TYPES = listOf("город", "гор\\.", "г\\.", "пос\\.", "посёлок", "поселок", "село", "деревня")
+
+        /** Обозначения улицы и прочих проездов. */
+        private val STREET_TYPES =
+            listOf(
+                "улица",
+                "ул\\.",
+                "проспект",
+                "пр-т",
+                "просп\\.",
+                "переулок",
+                "пер\\.",
+                "шоссе",
+                "ш\\.",
+                "бульвар",
+                "б-р",
+                "набережная",
+                "наб\\.",
+                "проезд",
+            )
     }
 }

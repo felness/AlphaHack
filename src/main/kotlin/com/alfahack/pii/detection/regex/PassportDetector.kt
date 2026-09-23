@@ -24,10 +24,10 @@ class PassportDetector : Detector {
     override val supportedTypes: Set<PiiType> = setOf(PiiType.PASSPORT_SERIES_NUMBER)
 
     // Компактный формат с разделителем: 4509 123456, 4509-123456
-    private val compactPattern: Pattern = Pattern.compile(COMPACT_REGEX)
+    private val compactPattern: Pattern = Pattern.compile(COMPACT_REGEX, Pattern.UNICODE_CHARACTER_CLASS)
 
     // Формат без разделителя: 4509123456 (только при контексте паспорта)
-    private val noSeparatorPattern: Pattern = Pattern.compile(NO_SEPARATOR_REGEX)
+    private val noSeparatorPattern: Pattern = Pattern.compile(NO_SEPARATOR_REGEX, Pattern.UNICODE_CHARACTER_CLASS)
 
     // Серия (4 цифры) после слова «серия» — span = только цифры (группа 1)
     private val seriesPattern: Pattern = Pattern.compile(SERIES_REGEX, Pattern.UNICODE_CHARACTER_CLASS)
