@@ -114,9 +114,9 @@ class Metrics:
             if tokens:
                 pipe.incrby(_TOTAL_TOKENS, tokens)
             if rps:
-                pipe.zadd(_RPS_WINDOW, {f"{self._worker_id}:{now}": now})
+                pipe.zadd(_RPS_WINDOW, {f"{self._worker_id}:{now}:{len(rps)}": now})
             if tps:
-                pipe.zadd(_TPS_WINDOW, {f"{self._worker_id}:{now}": sum(t for _, t in tps)})
+                pipe.zadd(_TPS_WINDOW, {f"{self._worker_id}:{now}:{sum(t for _, t in tps)}": now})
             if latency_sum:
                 pipe.incrbyfloat(_LATENCY_SUM, latency_sum)
                 pipe.incrby(_LATENCY_COUNT, latency_count)
@@ -145,12 +145,19 @@ class Metrics:
             now = time.time()
             cutoff = now - self._window
             self._redis.zremrangebyscore(_RPS_WINDOW, 0, cutoff)
-            count = self._redis.zcard(_RPS_WINDOW)
-            oldest = self._redis.zrange(_RPS_WINDOW, 0, 0, withscores=True)
-            if not oldest:
+            entries = self._redis.zrange(_RPS_WINDOW, 0, -1, withscores=True)
+            if not entries:
                 return 0.0
-            elapsed = max(1.0, now - oldest[0][1])
-            return count / elapsed
+            total = 0
+            for member, ts in entries:
+                # member = "worker:now:count"
+                try:
+                    total += int(member.rsplit(":", 1)[1])
+                except (ValueError, IndexError):
+                    total += 1
+            oldest = entries[0][1]
+            elapsed = max(1.0, now - oldest)
+            return total / elapsed
         except Exception as exc:  # noqa: BLE001
             logger.warning("Не удалось получить RPS: %s", exc)
             return 0.0
@@ -164,7 +171,13 @@ class Metrics:
             entries = self._redis.zrange(_TPS_WINDOW, 0, -1, withscores=True)
             if not entries:
                 return 0.0
-            total = sum(float(score) for _, score in entries)
+            total = 0
+            for member, _ in entries:
+                # member = "worker:now:count"
+                try:
+                    total += int(member.rsplit(":", 1)[1])
+                except (ValueError, IndexError):
+                    total += 1
             oldest = entries[0][1]
             elapsed = max(1.0, now - oldest)
             return total / elapsed
