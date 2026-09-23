@@ -479,6 +479,11 @@ def detect_fio(text: str) -> list[Match]:
             _, end2, w2 = positions[i + 1]
             if w2 in RUSSIAN_SURNAMES:
                 matches.append(Match("fio", start, end2, text[start:end2]))
+        # Фамилия + имя (2 слова)
+        if w in RUSSIAN_SURNAMES and i + 1 < len(positions):
+            _, end2, w2 = positions[i + 1]
+            if w2 in RUSSIAN_NAMES:
+                matches.append(Match("fio", start, end2, text[start:end2]))
         # Фамилия + имя + отчество
         if w in RUSSIAN_SURNAMES and i + 2 < len(positions):
             _, end2, w2 = positions[i + 1]
