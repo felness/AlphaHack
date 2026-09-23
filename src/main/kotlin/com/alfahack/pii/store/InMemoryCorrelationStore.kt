@@ -13,16 +13,14 @@ import java.util.concurrent.ConcurrentHashMap
 @Component
 @ConditionalOnProperty(name = ["pii.store.type"], havingValue = "in-memory", matchIfMissing = true)
 class InMemoryCorrelationStore : CorrelationStore {
-
     private val store = ConcurrentHashMap<String, CorrelationRecord>()
 
-    override fun save(payloadId: String, record: CorrelationRecord): Boolean {
-        return store.putIfAbsent(payloadId, record) == null
-    }
+    override fun save(
+        payloadId: String,
+        record: CorrelationRecord,
+    ): Boolean = store.putIfAbsent(payloadId, record) == null
 
-    override fun find(payloadId: String): CorrelationRecord? {
-        return store[payloadId]
-    }
+    override fun find(payloadId: String): CorrelationRecord? = store[payloadId]
 
     override fun delete(payloadId: String) {
         store.remove(payloadId)

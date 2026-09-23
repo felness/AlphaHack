@@ -14,7 +14,6 @@ import java.util.regex.Pattern
  */
 @Component
 class CitizenshipDetector : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.CITIZENSHIP)
 
     private val pattern: Pattern = Pattern.compile(CITIZENSHIP_REGEX, Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CHARACTER_CLASS)
@@ -31,8 +30,8 @@ class CitizenshipDetector : Detector {
                     end = matcher.end(),
                     confidence = 0.85,
                     source = DetectorSource.DICTIONARY,
-                    validated = true
-                )
+                    validated = true,
+                ),
             )
         }
 

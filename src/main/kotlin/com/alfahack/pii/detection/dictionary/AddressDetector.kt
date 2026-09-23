@@ -17,9 +17,8 @@ import java.util.regex.Pattern
  */
 @Component
 class AddressDetector(
-    private val contextRules: ContextRules
+    private val contextRules: ContextRules,
 ) : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.ADDRESS)
 
     private val pattern: Pattern = Pattern.compile(ADDRESS_REGEX, Pattern.UNICODE_CHARACTER_CLASS)
@@ -43,8 +42,8 @@ class AddressDetector(
                         end = end,
                         confidence = 0.85,
                         source = DetectorSource.DICTIONARY,
-                        validated = true
-                    )
+                        validated = true,
+                    ),
                 )
             }
         }

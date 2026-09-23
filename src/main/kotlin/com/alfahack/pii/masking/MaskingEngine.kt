@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component
  */
 @Component
 class MaskingEngine {
-
     /**
      * Замаскировать текст по найденным сущностям.
      *
@@ -21,11 +20,16 @@ class MaskingEngine {
      * @param format формат маски (STAR по умолчанию)
      * @return результат маскирования
      */
-    fun mask(text: String, entities: List<DetectedEntity>, format: MaskFormat = MaskFormat.STAR): MaskingResult {
+    fun mask(
+        text: String,
+        entities: List<DetectedEntity>,
+        format: MaskFormat = MaskFormat.STAR,
+    ): MaskingResult {
         // Фильтруем сущности: только валидные spans в пределах текста
-        val valid = entities
-            .filter { it.start >= 0 && it.end <= text.length && it.start < it.end }
-            .sortedBy { it.start }
+        val valid =
+            entities
+                .filter { it.start >= 0 && it.end <= text.length && it.start < it.end }
+                .sortedBy { it.start }
 
         // Убираем перекрывающиеся spans: оставляем только неперекрывающиеся
         // (при перекрытии оставляем первую по позиции)
@@ -53,35 +57,46 @@ class MaskingEngine {
                         type = entity.type,
                         start = entity.start,
                         end = entity.end,
-                        original = original
-                    )
+                        original = original,
+                    ),
                 )
             }
         }
 
         return MaskingResult(
             maskedText = sb.toString(),
-            spans = spans.sortedBy { it.start }
+            spans = spans.sortedBy { it.start },
         )
     }
 
     /**
      * Замаскировать отдельное значение, сохраняя длину и разделители.
      */
-    private fun maskValue(value: String, format: MaskFormat): String {
-        return when (format) {
-            MaskFormat.STAR -> value.map { ch -> if (ch.isLetterOrDigit()) '*' else ch }.joinToString("")
-            MaskFormat.TOKEN -> value.map { ch -> if (ch.isLetterOrDigit()) 'X' else ch }.joinToString("")
+    private fun maskValue(
+        value: String,
+        format: MaskFormat,
+    ): String =
+        when (format) {
+            MaskFormat.STAR -> {
+                value.map { ch -> if (ch.isLetterOrDigit()) '*' else ch }.joinToString("")
+            }
+
+            MaskFormat.TOKEN -> {
+                value.map { ch -> if (ch.isLetterOrDigit()) 'X' else ch }.joinToString("")
+            }
+
             // Синтетические данные: замена на случайные символы (сохраняя длину и разделители)
-            MaskFormat.SYNTHETIC -> value.map { ch ->
-                when {
-                    ch.isDigit() -> ('0' + random.nextInt(10))
-                    ch.isLetter() -> ('а' + random.nextInt(32))
-                    else -> ch
-                }
-            }.joinToString("")
+            MaskFormat.SYNTHETIC -> {
+                value
+                    .map { ch ->
+                        when {
+                            ch.isDigit() -> ('0' + random.nextInt(10))
+                            ch.isLetter() -> ('а' + random.nextInt(32))
+                            else -> ch
+                        }
+                    }.joinToString("")
+            }
         }
-    }
 
     companion object {
         private val random = java.util.Random()

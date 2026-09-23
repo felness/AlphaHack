@@ -21,7 +21,6 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 @AutoConfigureMockMvc
 @TestPropertySource(properties = ["pii.store.type=in-memory"])
 class LargeTextTest {
-
     @Autowired
     lateinit var mockMvc: MockMvc
 
@@ -31,11 +30,13 @@ class LargeTextTest {
         val filler = "обычный текст без персональных данных ".repeat(8000) // ~320 000 символов
         val payload = "паспорт 4509 123456, email ivanov@mail.ru, телефон +7 (900) 123-45-67. $filler ИНН 770100000079 в конце"
 
-        val response = mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"$payload","payload_id":"large-1"}""")
-        ).andReturn()
+        val response =
+            mockMvc
+                .perform(
+                    post("/process")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"payload":"$payload","payload_id":"large-1"}"""),
+                ).andReturn()
 
         assertEquals(200, response.response.status, "Large text should be processed without failure")
         val result = extractResult(response.response.contentAsString)

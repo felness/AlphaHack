@@ -7,7 +7,6 @@ package com.alfahack.pii.detection
  * regex, ML/NER, словари. Новый тип ПД = новый Detector.
  */
 interface Detector {
-
     /**
      * Типы ПД, которые поддерживает этот детектор.
      */

@@ -13,9 +13,8 @@ import org.springframework.stereotype.Component
  */
 @Component
 class SystemRegistry(
-    private val properties: PiiProperties
+    private val properties: PiiProperties,
 ) {
-
     /**
      * Определить систему по идентификатору из заголовка.
      *
@@ -25,8 +24,9 @@ class SystemRegistry(
      */
     fun resolve(systemId: String?): SystemConfig {
         val id = systemId ?: DEFAULT_SYSTEM
-        val config = properties.systems[id]
-            ?: throw SystemNotAllowedException(id)
+        val config =
+            properties.systems[id]
+                ?: throw SystemNotAllowedException(id)
         if (!config.enabled) {
             throw SystemNotAllowedException(id)
         }
@@ -40,7 +40,10 @@ class SystemRegistry(
      * @param detected обнаруженные типы ПД
      * @return типы ПД, которые система разрешает маскировать
      */
-    fun filterTypes(config: SystemConfig, detected: Set<PiiType>): Set<PiiType> {
+    fun filterTypes(
+        config: SystemConfig,
+        detected: Set<PiiType>,
+    ): Set<PiiType> {
         val allowed = config.maskingTypes
         if (allowed.contains(ALL)) {
             return detected

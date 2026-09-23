@@ -17,11 +17,13 @@ import org.springframework.web.context.request.WebRequest
  */
 @RestControllerAdvice
 class GlobalExceptionHandler {
-
     private val log = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
 
     @ExceptionHandler(ApiException::class)
-    fun handleApiException(ex: ApiException, request: WebRequest): ResponseEntity<ErrorResponse> {
+    fun handleApiException(
+        ex: ApiException,
+        request: WebRequest,
+    ): ResponseEntity<ErrorResponse> {
         log.warn("API error: status={}, message={}", ex.status.value(), ex.message)
         return ResponseEntity
             .status(ex.status)
@@ -30,8 +32,9 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidationException(ex: MethodArgumentNotValidException): ResponseEntity<ErrorResponse> {
-        val message = ex.bindingResult.fieldErrors
-            .joinToString("; ") { "${it.field}: ${it.defaultMessage}" }
+        val message =
+            ex.bindingResult.fieldErrors
+                .joinToString("; ") { "${it.field}: ${it.defaultMessage}" }
         log.warn("Validation error: {}", message)
         return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
@@ -73,6 +76,6 @@ class GlobalExceptionHandler {
 
     data class ErrorResponse(
         val status: Int,
-        val message: String
+        val message: String,
     )
 }

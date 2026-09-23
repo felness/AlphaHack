@@ -17,58 +17,75 @@ import java.util.concurrent.atomic.AtomicLong
  */
 @Component
 class MetricsService(
-    private val meterRegistry: MeterRegistry
+    private val meterRegistry: MeterRegistry,
 ) {
+    private val requestsTotal: Counter =
+        Counter
+            .builder("pii_requests_total")
+            .description("Total requests")
+            .register(meterRegistry)
 
-    private val requestsTotal: Counter = Counter.builder("pii_requests_total")
-        .description("Total requests")
-        .register(meterRegistry)
+    private val maskingTotal: Counter =
+        Counter
+            .builder("pii_requests_masking_total")
+            .description("Masking requests")
+            .register(meterRegistry)
 
-    private val maskingTotal: Counter = Counter.builder("pii_requests_masking_total")
-        .description("Masking requests")
-        .register(meterRegistry)
+    private val unmaskingTotal: Counter =
+        Counter
+            .builder("pii_requests_unmasking_total")
+            .description("Unmasking requests")
+            .register(meterRegistry)
 
-    private val unmaskingTotal: Counter = Counter.builder("pii_requests_unmasking_total")
-        .description("Unmasking requests")
-        .register(meterRegistry)
+    private val errorsTotal: Counter =
+        Counter
+            .builder("pii_requests_errors_total")
+            .description("Request errors")
+            .register(meterRegistry)
 
-    private val errorsTotal: Counter = Counter.builder("pii_requests_errors_total")
-        .description("Request errors")
-        .register(meterRegistry)
+    private val latency: Timer =
+        Timer
+            .builder("pii_latency_seconds")
+            .description("Request latency")
+            .publishPercentiles(0.5, 0.95, 0.99)
+            // Публикуем histogram buckets для точных перцентилей по времени
+            // (histogram_quantile в Prometheus/Grafana)
+            .publishPercentileHistogram(true)
+            .register(meterRegistry)
 
-    private val latency: Timer = Timer.builder("pii_latency_seconds")
-        .description("Request latency")
-        .publishPercentiles(0.5, 0.95, 0.99)
-        // Публикуем histogram buckets для точных перцентилей по времени
-        // (histogram_quantile в Prometheus/Grafana)
-        .publishPercentileHistogram(true)
-        .register(meterRegistry)
+    private val maskingLatency: Timer =
+        Timer
+            .builder("pii_latency_masking_seconds")
+            .description("Masking latency")
+            .publishPercentiles(0.5, 0.95, 0.99)
+            .publishPercentileHistogram(true)
+            .register(meterRegistry)
 
-    private val maskingLatency: Timer = Timer.builder("pii_latency_masking_seconds")
-        .description("Masking latency")
-        .publishPercentiles(0.5, 0.95, 0.99)
-        .publishPercentileHistogram(true)
-        .register(meterRegistry)
+    private val unmaskingLatency: Timer =
+        Timer
+            .builder("pii_latency_unmasking_seconds")
+            .description("Unmasking latency")
+            .publishPercentiles(0.5, 0.95, 0.99)
+            .publishPercentileHistogram(true)
+            .register(meterRegistry)
 
-    private val unmaskingLatency: Timer = Timer.builder("pii_latency_unmasking_seconds")
-        .description("Unmasking latency")
-        .publishPercentiles(0.5, 0.95, 0.99)
-        .publishPercentileHistogram(true)
-        .register(meterRegistry)
-
-    private val rateLimitedTotal: Counter = Counter.builder("pii_rate_limited_total")
-        .description("Rate limited requests (429)")
-        .register(meterRegistry)
+    private val rateLimitedTotal: Counter =
+        Counter
+            .builder("pii_rate_limited_total")
+            .description("Rate limited requests (429)")
+            .register(meterRegistry)
 
     // Текущее значение RPS (запросов в секунду) — обновляется периодически
     private val rpsValue = AtomicLong(0)
     private val tpsValue = AtomicLong(0)
 
     init {
-        Gauge.builder("pii_rps", rpsValue) { it.get().toDouble() }
+        Gauge
+            .builder("pii_rps", rpsValue) { it.get().toDouble() }
             .description("Requests per second")
             .register(meterRegistry)
-        Gauge.builder("pii_tps", tpsValue) { it.get().toDouble() }
+        Gauge
+            .builder("pii_tps", tpsValue) { it.get().toDouble() }
             .description("Tokens per second")
             .register(meterRegistry)
     }
@@ -106,7 +123,8 @@ class MetricsService(
     }
 
     fun recordEntityDetected(type: PiiType) {
-        Counter.builder("pii_entities_detected_total")
+        Counter
+            .builder("pii_entities_detected_total")
             .description("Detected entities by type")
             .tag("type", type.name)
             .register(meterRegistry)

@@ -18,13 +18,12 @@ import org.springframework.web.bind.annotation.RestController
  */
 @RestController
 class ProcessController(
-    private val processService: ProcessService
+    private val processService: ProcessService,
 ) {
-
     @PostMapping("/process")
     fun process(
         @Valid @RequestBody request: ProcessRequest,
-        @RequestHeader(name = "X-System-Id", required = false) systemId: String?
+        @RequestHeader(name = "X-System-Id", required = false) systemId: String?,
     ): ResponseEntity<ProcessResponse> {
         val response = processService.process(request, systemId)
         return ResponseEntity.ok(response)

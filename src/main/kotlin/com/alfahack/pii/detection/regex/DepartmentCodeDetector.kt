@@ -16,7 +16,6 @@ import java.util.regex.Pattern
  */
 @Component
 class DepartmentCodeDetector : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.PASSPORT_DEPARTMENT_CODE)
 
     private val pattern: Pattern = Pattern.compile(DEPARTMENT_CODE_REGEX)
@@ -38,8 +37,8 @@ class DepartmentCodeDetector : Detector {
                         end = end,
                         confidence = 0.9,
                         source = DetectorSource.REGEX,
-                        validated = true
-                    )
+                        validated = true,
+                    ),
                 )
             }
         }
@@ -50,7 +49,11 @@ class DepartmentCodeDetector : Detector {
     /**
      * Проверить, есть ли рядом контекст «код подразделения».
      */
-    private fun hasDepartmentCodeContext(text: String, start: Int, end: Int): Boolean {
+    private fun hasDepartmentCodeContext(
+        text: String,
+        start: Int,
+        end: Int,
+    ): Boolean {
         val from = (start - CONTEXT_WINDOW).coerceAtLeast(0)
         val to = (end + CONTEXT_WINDOW).coerceAtMost(text.length)
         val window = text.substring(from, to)
@@ -65,8 +68,11 @@ class DepartmentCodeDetector : Detector {
             "\\b\\d{3}-\\d{3}\\b"
 
         // Ключевые слова кода подразделения
-        private val DEPARTMENT_CODE_KEYWORDS = listOf(
-            "код подразделения", "подразделение", "код"
-        )
+        private val DEPARTMENT_CODE_KEYWORDS =
+            listOf(
+                "код подразделения",
+                "подразделение",
+                "код",
+            )
     }
 }

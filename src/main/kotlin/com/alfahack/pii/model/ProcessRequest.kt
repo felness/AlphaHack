@@ -13,8 +13,7 @@ data class ProcessRequest(
     @field:NotBlank
     @JsonProperty("payload")
     val payload: String?,
-
     @field:NotBlank
     @JsonProperty("payload_id")
-    val payloadId: String?
+    val payloadId: String?,
 )

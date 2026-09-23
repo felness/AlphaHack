@@ -17,21 +17,20 @@ import org.springframework.web.filter.OncePerRequestFilter
 @Component
 class RateLimitFilter(
     private val rateLimitService: RateLimitService,
-    meterRegistry: MeterRegistry
+    meterRegistry: MeterRegistry,
 ) : OncePerRequestFilter() {
+    private val rateLimitedTotal: Counter =
+        Counter
+            .builder("pii_rate_limited_total")
+            .description("Rate limited requests (429)")
+            .register(meterRegistry)
 
-    private val rateLimitedTotal: Counter = Counter.builder("pii_rate_limited_total")
-        .description("Rate limited requests (429)")
-        .register(meterRegistry)
-
-    override fun shouldNotFilter(request: HttpServletRequest): Boolean {
-        return request.requestURI != "/process"
-    }
+    override fun shouldNotFilter(request: HttpServletRequest): Boolean = request.requestURI != "/process"
 
     override fun doFilterInternal(
         request: HttpServletRequest,
         response: HttpServletResponse,
-        filterChain: FilterChain
+        filterChain: FilterChain,
     ) {
         try {
             rateLimitService.tryConsume()

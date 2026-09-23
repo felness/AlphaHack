@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test
  * Тесты новых детекторов (11 категорий, добавленных для полного покрытия).
  */
 class NewDetectorsTest {
-
     private val contextRules = ContextRules()
     private val nameDetector = NameDetector(contextRules)
     private val addressDetector = AddressDetector(contextRules)

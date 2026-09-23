@@ -18,7 +18,6 @@ import java.util.regex.Pattern
  */
 @Component
 class DriverLicenseDetector : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.DRIVER_LICENSE)
 
     private val pattern: Pattern = Pattern.compile(DRIVER_LICENSE_REGEX)
@@ -40,8 +39,8 @@ class DriverLicenseDetector : Detector {
                         end = end,
                         confidence = 0.85,
                         source = DetectorSource.REGEX,
-                        validated = true
-                    )
+                        validated = true,
+                    ),
                 )
             }
         }
@@ -52,7 +51,11 @@ class DriverLicenseDetector : Detector {
     /**
      * Проверить, есть ли рядом контекст «водительское удостоверение».
      */
-    private fun hasDriverLicenseContext(text: String, start: Int, end: Int): Boolean {
+    private fun hasDriverLicenseContext(
+        text: String,
+        start: Int,
+        end: Int,
+    ): Boolean {
         val from = (start - CONTEXT_WINDOW).coerceAtLeast(0)
         val to = (end + CONTEXT_WINDOW).coerceAtMost(text.length)
         val window = text.substring(from, to)
@@ -67,8 +70,12 @@ class DriverLicenseDetector : Detector {
             "\\b\\d{2}[\\s\\-]?\\d{2}[\\s\\-]?\\d{6}\\b"
 
         // Ключевые слова водительского удостоверения
-        private val DRIVER_LICENSE_KEYWORDS = listOf(
-            "водительское", "удостоверение", "в/у", "права"
-        )
+        private val DRIVER_LICENSE_KEYWORDS =
+            listOf(
+                "водительское",
+                "удостоверение",
+                "в/у",
+                "права",
+            )
     }
 }

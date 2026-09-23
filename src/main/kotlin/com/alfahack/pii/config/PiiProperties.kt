@@ -18,16 +18,16 @@ data class PiiProperties(
     var maxPayloadSize: Long = 1_000_000,
     var correlationTtlSeconds: Long = 86_400,
     var rateLimitRps: Int = 2_000,
-    var systems: Map<String, SystemConfig> = emptyMap()
+    var systems: Map<String, SystemConfig> = emptyMap(),
 ) {
     data class Store(
-        var type: String = "in-memory"
+        var type: String = "in-memory",
     )
 
     data class SystemConfig(
         var enabled: Boolean = true,
         var maskingTypes: List<String> = listOf("ALL"),
         var unmaskingEnabled: Boolean = true,
-        var maskFormat: String = "STAR"
+        var maskFormat: String = "STAR",
     )
 }

@@ -15,7 +15,6 @@ import java.util.regex.Pattern
  */
 @Component
 class CvvDetector : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.CVV)
 
     private val pattern: Pattern = Pattern.compile(CVV_REGEX, Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CHARACTER_CLASS)
@@ -33,8 +32,8 @@ class CvvDetector : Detector {
                     end = matcher.end(1),
                     confidence = 0.9,
                     source = DetectorSource.REGEX,
-                    validated = true
-                )
+                    validated = true,
+                ),
             )
         }
 

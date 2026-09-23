@@ -8,20 +8,20 @@ import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Test
 
 class MaskingEngineTest {
-
     private val engine = MaskingEngine()
 
     @Test
     fun `mask preserves length and separators`() {
         val text = "паспорт 4509 123456"
-        val entity = DetectedEntity(
-            type = PiiType.PASSPORT_SERIES_NUMBER,
-            start = 8,
-            end = 19,
-            confidence = 0.9,
-            source = DetectorSource.REGEX,
-            validated = true
-        )
+        val entity =
+            DetectedEntity(
+                type = PiiType.PASSPORT_SERIES_NUMBER,
+                start = 8,
+                end = 19,
+                confidence = 0.9,
+                source = DetectorSource.REGEX,
+                validated = true,
+            )
 
         val result = engine.mask(text, listOf(entity))
 
@@ -34,14 +34,15 @@ class MaskingEngineTest {
     @Test
     fun `mask replaces letters and digits but keeps separators`() {
         val text = "email ivanov@mail.ru"
-        val entity = DetectedEntity(
-            type = PiiType.EMAIL,
-            start = 6,
-            end = 20,
-            confidence = 0.95,
-            source = DetectorSource.REGEX,
-            validated = true
-        )
+        val entity =
+            DetectedEntity(
+                type = PiiType.EMAIL,
+                start = 6,
+                end = 20,
+                confidence = 0.95,
+                source = DetectorSource.REGEX,
+                validated = true,
+            )
 
         val result = engine.mask(text, listOf(entity))
 
@@ -52,22 +53,24 @@ class MaskingEngineTest {
     @Test
     fun `mask multiple entities`() {
         val text = "Иванов Иван, ivanov@mail.ru"
-        val name = DetectedEntity(
-            type = PiiType.FULL_NAME,
-            start = 0,
-            end = 11,
-            confidence = 0.9,
-            source = DetectorSource.REGEX,
-            validated = true
-        )
-        val email = DetectedEntity(
-            type = PiiType.EMAIL,
-            start = 13,
-            end = 27,
-            confidence = 0.95,
-            source = DetectorSource.REGEX,
-            validated = true
-        )
+        val name =
+            DetectedEntity(
+                type = PiiType.FULL_NAME,
+                start = 0,
+                end = 11,
+                confidence = 0.9,
+                source = DetectorSource.REGEX,
+                validated = true,
+            )
+        val email =
+            DetectedEntity(
+                type = PiiType.EMAIL,
+                start = 13,
+                end = 27,
+                confidence = 0.95,
+                source = DetectorSource.REGEX,
+                validated = true,
+            )
 
         val result = engine.mask(text, listOf(name, email))
 
@@ -78,14 +81,15 @@ class MaskingEngineTest {
     @Test
     fun `synthetic format generates random chars preserving length`() {
         val text = "паспорт 4509 123456"
-        val entity = DetectedEntity(
-            type = PiiType.PASSPORT_SERIES_NUMBER,
-            start = 8,
-            end = 19,
-            confidence = 0.9,
-            source = DetectorSource.REGEX,
-            validated = true
-        )
+        val entity =
+            DetectedEntity(
+                type = PiiType.PASSPORT_SERIES_NUMBER,
+                start = 8,
+                end = 19,
+                confidence = 0.9,
+                source = DetectorSource.REGEX,
+                validated = true,
+            )
 
         val result = engine.mask(text, listOf(entity), MaskFormat.SYNTHETIC)
 

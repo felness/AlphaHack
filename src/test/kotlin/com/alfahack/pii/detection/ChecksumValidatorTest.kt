@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test
  * Тесты checksum-валидации (ИНН, Luhn).
  */
 class ChecksumValidatorTest {
-
     private val validator = ChecksumValidator()
 
     @Test

@@ -10,5 +10,5 @@ package com.alfahack.pii.masking
 enum class MaskFormat {
     STAR,
     TOKEN,
-    SYNTHETIC
+    SYNTHETIC,
 }

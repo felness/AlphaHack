@@ -12,7 +12,6 @@ import java.util.regex.Pattern
  */
 @Component
 class PhoneDetector : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.PHONE)
 
     private val pattern: Pattern = Pattern.compile(PHONE_REGEX)
@@ -29,8 +28,8 @@ class PhoneDetector : Detector {
                     end = matcher.end(),
                     confidence = 0.9,
                     source = DetectorSource.REGEX,
-                    validated = true
-                )
+                    validated = true,
+                ),
             )
         }
 

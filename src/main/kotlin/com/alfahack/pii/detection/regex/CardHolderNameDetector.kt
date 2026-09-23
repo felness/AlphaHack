@@ -15,7 +15,6 @@ import java.util.regex.Pattern
  */
 @Component
 class CardHolderNameDetector : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.CARD_HOLDER_NAME)
 
     private val pattern: Pattern = Pattern.compile(CARD_HOLDER_REGEX, Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CHARACTER_CLASS)
@@ -33,8 +32,8 @@ class CardHolderNameDetector : Detector {
                     end = matcher.end(1),
                     confidence = 0.85,
                     source = DetectorSource.REGEX,
-                    validated = true
-                )
+                    validated = true,
+                ),
             )
         }
 

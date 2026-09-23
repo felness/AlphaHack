@@ -16,7 +16,7 @@ data class CorrelationRecord(
     val mask: String,
     val spans: List<MaskedSpan>,
     val systemId: String = "default",
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
 )
 
 /**
@@ -31,5 +31,5 @@ data class MaskedSpan(
     val type: PiiType,
     val start: Int,
     val end: Int,
-    val original: String
+    val original: String,
 )

@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component
  */
 @Component
 class UnmaskingEngine {
-
     /**
      * Восстановить исходную строку из маски по карте соответствий.
      *
@@ -19,13 +18,17 @@ class UnmaskingEngine {
      * @param spans карта соответствий
      * @return исходная строка
      */
-    fun unmask(maskedText: String, spans: List<MaskedSpan>): String {
+    fun unmask(
+        maskedText: String,
+        spans: List<MaskedSpan>,
+    ): String {
         val sb = StringBuilder(maskedText)
 
         // Фильтруем только валидные spans (в пределах текста, start < end)
-        val valid = spans
-            .filter { it.start >= 0 && it.end <= maskedText.length && it.start < it.end }
-            .sortedByDescending { it.start }
+        val valid =
+            spans
+                .filter { it.start >= 0 && it.end <= maskedText.length && it.start < it.end }
+                .sortedByDescending { it.start }
 
         // Применяем с конца, чтобы не сдвигать позиции
         for (span in valid) {

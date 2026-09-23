@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class DetectorsTest {
-
     private val checksumValidator = ChecksumValidator()
     private val contextRules = ContextRules()
     private val emailDetector = EmailDetector()

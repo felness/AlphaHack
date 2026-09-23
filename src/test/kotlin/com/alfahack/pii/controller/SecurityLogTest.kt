@@ -24,7 +24,6 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 @TestPropertySource(properties = ["pii.store.type=in-memory"])
 @ExtendWith(OutputCaptureExtension::class)
 class SecurityLogTest {
-
     @Autowired
     lateinit var mockMvc: MockMvc
 
@@ -33,11 +32,12 @@ class SecurityLogTest {
         val payload = "паспорт 4509 123456, email ivanov@mail.ru, телефон +7 (900) 123-45-67"
         val payloadId = "sec-1"
 
-        mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"$payload","payload_id":"$payloadId"}""")
-        ).andReturn()
+        mockMvc
+            .perform(
+                post("/process")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"payload":"$payload","payload_id":"$payloadId"}"""),
+            ).andReturn()
 
         // В логах не должно быть значений ПД
         assertFalse(output.all.contains("4509 123456"), "Passport number leaked to logs")
@@ -51,19 +51,22 @@ class SecurityLogTest {
         val payloadId = "sec-2"
 
         // Маскирование
-        val maskResponse = mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"$payload","payload_id":"$payloadId"}""")
-        ).andReturn()
+        val maskResponse =
+            mockMvc
+                .perform(
+                    post("/process")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"payload":"$payload","payload_id":"$payloadId"}"""),
+                ).andReturn()
         val mask = extractResult(maskResponse.response.contentAsString)
 
         // Демаскирование
-        mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"$mask","payload_id":"$payloadId"}""")
-        ).andReturn()
+        mockMvc
+            .perform(
+                post("/process")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"payload":"$mask","payload_id":"$payloadId"}"""),
+            ).andReturn()
 
         // В логах не должно быть значений ПД
         assertFalse(output.all.contains("4509 123456"), "Passport number leaked to logs")

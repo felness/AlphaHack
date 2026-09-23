@@ -12,13 +12,13 @@ import java.util.regex.Pattern
  */
 @Component
 class EmailDetector : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.EMAIL)
 
-    private val pattern: Pattern = Pattern.compile(
-        EMAIL_REGEX,
-        Pattern.CASE_INSENSITIVE
-    )
+    private val pattern: Pattern =
+        Pattern.compile(
+            EMAIL_REGEX,
+            Pattern.CASE_INSENSITIVE,
+        )
 
     override fun detect(text: String): List<DetectedEntity> {
         val matcher = pattern.matcher(text)
@@ -32,8 +32,8 @@ class EmailDetector : Detector {
                     end = matcher.end(),
                     confidence = 0.95,
                     source = DetectorSource.REGEX,
-                    validated = true
-                )
+                    validated = true,
+                ),
             )
         }
 

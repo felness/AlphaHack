@@ -21,7 +21,6 @@ import java.util.regex.Pattern
  */
 @Component
 class PassportDetector : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.PASSPORT_SERIES_NUMBER)
 
     // Компактный формат с разделителем: 4509 123456, 4509-123456
@@ -73,23 +72,29 @@ class PassportDetector : Detector {
     /**
      * Проверить, есть ли рядом контекст паспорта.
      */
-    private fun hasPassportContext(text: String, start: Int, end: Int): Boolean {
+    private fun hasPassportContext(
+        text: String,
+        start: Int,
+        end: Int,
+    ): Boolean {
         val from = (start - CONTEXT_WINDOW).coerceAtLeast(0)
         val to = (end + CONTEXT_WINDOW).coerceAtMost(text.length)
         val window = text.substring(from, to)
         return PASSPORT_KEYWORDS.any { window.contains(it, ignoreCase = true) }
     }
 
-    private fun entity(start: Int, end: Int): DetectedEntity {
-        return DetectedEntity(
+    private fun entity(
+        start: Int,
+        end: Int,
+    ): DetectedEntity =
+        DetectedEntity(
             type = PiiType.PASSPORT_SERIES_NUMBER,
             start = start,
             end = end,
             confidence = 0.9,
             source = DetectorSource.REGEX,
-            validated = true
+            validated = true,
         )
-    }
 
     companion object {
         private const val CONTEXT_WINDOW = 40
@@ -111,8 +116,12 @@ class PassportDetector : Detector {
             "\\bномер\\s+(\\d{6})\\b"
 
         // Ключевые слова паспорта
-        private val PASSPORT_KEYWORDS = listOf(
-            "паспорт", "серия", "номер", "документ"
-        )
+        private val PASSPORT_KEYWORDS =
+            listOf(
+                "паспорт",
+                "серия",
+                "номер",
+                "документ",
+            )
     }
 }

@@ -19,30 +19,29 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 @AutoConfigureMockMvc
 @TestPropertySource(properties = ["pii.store.type=in-memory"])
 class SystemAccessTest {
-
     @Autowired
     lateinit var mockMvc: MockMvc
 
     @Test
     fun `unknown system returns 403`() {
-        mockMvc.perform(
-            post("/process")
-                .header("X-System-Id", "unknown-system")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"паспорт 4509 123456","payload_id":"sys-1"}""")
-        )
-            .andReturn()
+        mockMvc
+            .perform(
+                post("/process")
+                    .header("X-System-Id", "unknown-system")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"payload":"паспорт 4509 123456","payload_id":"sys-1"}"""),
+            ).andReturn()
             .let { assertEquals(403, it.response.status) }
     }
 
     @Test
     fun `default system works without header`() {
-        mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"паспорт 4509 123456","payload_id":"sys-2"}""")
-        )
-            .andReturn()
+        mockMvc
+            .perform(
+                post("/process")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"payload":"паспорт 4509 123456","payload_id":"sys-2"}"""),
+            ).andReturn()
             .let { assertEquals(200, it.response.status) }
     }
 }

@@ -59,5 +59,5 @@ enum class PiiType {
     FOREIGN_PASSPORT,
 
     /** СНИЛС (11 цифр) */
-    SNILS
+    SNILS,
 }

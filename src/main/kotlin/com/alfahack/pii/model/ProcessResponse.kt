@@ -9,5 +9,5 @@ import com.fasterxml.jackson.annotation.JsonProperty
  */
 data class ProcessResponse(
     @JsonProperty("result")
-    val result: String
+    val result: String,
 )

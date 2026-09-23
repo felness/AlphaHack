@@ -23,11 +23,13 @@ import java.time.Duration
 class RedisCorrelationStore(
     private val redisTemplate: StringRedisTemplate,
     private val objectMapper: ObjectMapper,
-    private val properties: PiiProperties
+    private val properties: PiiProperties,
 ) : CorrelationStore {
-
     @CircuitBreaker(name = "redisStore")
-    override fun save(payloadId: String, record: CorrelationRecord): Boolean {
+    override fun save(
+        payloadId: String,
+        record: CorrelationRecord,
+    ): Boolean {
         val key = key(payloadId)
         val json = objectMapper.writeValueAsString(record)
 

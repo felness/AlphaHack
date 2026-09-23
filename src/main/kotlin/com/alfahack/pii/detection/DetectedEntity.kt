@@ -16,7 +16,7 @@ data class DetectedEntity(
     val end: Int,
     val confidence: Double,
     val source: DetectorSource,
-    val validated: Boolean = false
+    val validated: Boolean = false,
 )
 
 /**
@@ -26,5 +26,5 @@ enum class DetectorSource {
     REGEX,
     ML,
     DICTIONARY,
-    CONTEXT
+    CONTEXT,
 }

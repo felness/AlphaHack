@@ -15,9 +15,8 @@ import java.util.regex.Pattern
  */
 @Component
 class PlaceOfBirthDetector(
-    private val contextRules: ContextRules
+    private val contextRules: ContextRules,
 ) : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.PLACE_OF_BIRTH)
 
     private val pattern: Pattern = Pattern.compile(PLACE_OF_BIRTH_REGEX, Pattern.UNICODE_CHARACTER_CLASS)
@@ -41,8 +40,8 @@ class PlaceOfBirthDetector(
                         end = end,
                         confidence = 0.85,
                         source = DetectorSource.DICTIONARY,
-                        validated = true
-                    )
+                        validated = true,
+                    ),
                 )
             }
         }

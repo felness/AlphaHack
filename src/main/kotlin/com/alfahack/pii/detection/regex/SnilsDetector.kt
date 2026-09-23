@@ -15,7 +15,6 @@ import java.util.regex.Pattern
  */
 @Component
 class SnilsDetector : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.SNILS)
 
     private val pattern: Pattern = Pattern.compile(SNILS_REGEX)
@@ -32,8 +31,8 @@ class SnilsDetector : Detector {
                     end = matcher.end(),
                     confidence = 0.85,
                     source = DetectorSource.REGEX,
-                    validated = true
-                )
+                    validated = true,
+                ),
             )
         }
 

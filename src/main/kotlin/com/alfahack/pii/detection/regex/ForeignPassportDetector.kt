@@ -16,7 +16,6 @@ import java.util.regex.Pattern
  */
 @Component
 class ForeignPassportDetector : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.FOREIGN_PASSPORT)
 
     private val pattern: Pattern = Pattern.compile(FOREIGN_PASSPORT_REGEX, Pattern.UNICODE_CHARACTER_CLASS)
@@ -38,8 +37,8 @@ class ForeignPassportDetector : Detector {
                         end = end,
                         confidence = 0.85,
                         source = DetectorSource.REGEX,
-                        validated = true
-                    )
+                        validated = true,
+                    ),
                 )
             }
         }
@@ -50,7 +49,11 @@ class ForeignPassportDetector : Detector {
     /**
      * Проверить, есть ли рядом контекст загранпаспорта.
      */
-    private fun hasPassportContext(text: String, start: Int, end: Int): Boolean {
+    private fun hasPassportContext(
+        text: String,
+        start: Int,
+        end: Int,
+    ): Boolean {
         val from = (start - CONTEXT_WINDOW).coerceAtLeast(0)
         val to = (end + CONTEXT_WINDOW).coerceAtMost(text.length)
         val window = text.substring(from, to)
@@ -65,8 +68,11 @@ class ForeignPassportDetector : Detector {
             "\\b(?:[А-ЯЁ]{2}|\\d{2})\\s?\\d{7}\\b"
 
         // Ключевые слова загранпаспорта
-        private val PASSPORT_KEYWORDS = listOf(
-            "загранпаспорт", "загран", "паспорт"
-        )
+        private val PASSPORT_KEYWORDS =
+            listOf(
+                "загранпаспорт",
+                "загран",
+                "паспорт",
+            )
     }
 }

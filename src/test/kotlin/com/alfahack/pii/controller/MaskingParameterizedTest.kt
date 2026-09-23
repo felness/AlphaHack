@@ -24,7 +24,6 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 @AutoConfigureMockMvc
 @TestPropertySource(properties = ["pii.store.type=in-memory"])
 class MaskingParameterizedTest {
-
     @Autowired
     lateinit var mockMvc: MockMvc
 
@@ -35,27 +34,29 @@ class MaskingParameterizedTest {
         payloadId: String,
         expectedMask: String,
         expectedUnmask: String,
-        category: String
+        category: String,
     ) {
         // Шаг 1: маскирование
-        val maskResponse = mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"$payload","payload_id":"$payloadId"}""")
-        )
-            .andReturn()
+        val maskResponse =
+            mockMvc
+                .perform(
+                    post("/process")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"payload":"$payload","payload_id":"$payloadId"}"""),
+                ).andReturn()
 
         assertEquals(200, maskResponse.response.status, "Masking failed for [$category]: $payload")
         val actualMask = extractResult(maskResponse.response.contentAsString)
         assertEquals(expectedMask, actualMask, "Mask mismatch for [$category]: $payload")
 
         // Шаг 2: демаскирование
-        val unmaskResponse = mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"$actualMask","payload_id":"$payloadId"}""")
-        )
-            .andReturn()
+        val unmaskResponse =
+            mockMvc
+                .perform(
+                    post("/process")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"payload":"$actualMask","payload_id":"$payloadId"}"""),
+                ).andReturn()
 
         assertEquals(200, unmaskResponse.response.status, "Unmasking failed for [$category]: $actualMask")
         val actualUnmask = extractResult(unmaskResponse.response.contentAsString)

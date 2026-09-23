@@ -22,9 +22,8 @@ import java.util.regex.Pattern
 @Component
 class InnDetector(
     private val checksumValidator: ChecksumValidator,
-    private val contextRules: ContextRules
+    private val contextRules: ContextRules,
 ) : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.INN)
 
     private val pattern: Pattern = Pattern.compile("\\b\\d{10}(?:\\d{2})?\\b")
@@ -41,11 +40,12 @@ class InnDetector(
             val hasContext = contextRules.hasPositiveContext(text, start, end)
 
             // Валидный checksum → маскируем всегда. Невалидный → маскируем при позитивном контексте «ИНН».
-            val confidence = when {
-                valid -> 0.95
-                hasContext -> 0.8
-                else -> 0.5
-            }
+            val confidence =
+                when {
+                    valid -> 0.95
+                    hasContext -> 0.8
+                    else -> 0.5
+                }
             result.add(
                 DetectedEntity(
                     type = PiiType.INN,
@@ -53,8 +53,8 @@ class InnDetector(
                     end = end,
                     confidence = confidence,
                     source = DetectorSource.REGEX,
-                    validated = valid
-                )
+                    validated = valid,
+                ),
             )
         }
 

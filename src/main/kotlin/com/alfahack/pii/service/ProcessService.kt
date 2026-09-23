@@ -4,11 +4,10 @@ import com.alfahack.pii.config.PiiProperties
 import com.alfahack.pii.config.PiiProperties.SystemConfig
 import com.alfahack.pii.config.SystemRegistry
 import com.alfahack.pii.detection.DetectionEngine
-import com.alfahack.pii.exception.CorrelationNotFoundException
 import com.alfahack.pii.exception.PayloadTooLargeException
 import com.alfahack.pii.exception.SystemNotAllowedException
-import com.alfahack.pii.masking.MaskingEngine
 import com.alfahack.pii.masking.MaskFormat
+import com.alfahack.pii.masking.MaskingEngine
 import com.alfahack.pii.metrics.MetricsService
 import com.alfahack.pii.model.ProcessRequest
 import com.alfahack.pii.model.ProcessResponse
@@ -37,9 +36,8 @@ class ProcessService(
     private val systemRegistry: SystemRegistry,
     private val logMasker: LogMasker,
     private val metricsService: MetricsService,
-    private val properties: PiiProperties
+    private val properties: PiiProperties,
 ) {
-
     private val log = LoggerFactory.getLogger(ProcessService::class.java)
 
     /**
@@ -48,7 +46,10 @@ class ProcessService(
      * @param request запрос
      * @param systemId идентификатор системы из заголовка (может быть null → default)
      */
-    fun process(request: ProcessRequest, systemId: String?): ProcessResponse {
+    fun process(
+        request: ProcessRequest,
+        systemId: String?,
+    ): ProcessResponse {
         val start = System.nanoTime()
         metricsService.recordRequest()
 
@@ -68,13 +69,16 @@ class ProcessService(
 
             val existing = correlationStore.find(payloadId)
 
-            val response = when {
-                existing == null -> mask(payload, payloadId, system, resolvedSystemId)
-                // Идемпотентность: повторный запрос с тем же payload (оригинал) → вернуть сохранённую маску
-                payload == existing.original -> ProcessResponse(existing.mask)
-                // Демаскирование: пришла маска → восстановить оригинал
-                else -> unmask(payload, payloadId, existing, system, resolvedSystemId)
-            }
+            val response =
+                when {
+                    existing == null -> mask(payload, payloadId, system, resolvedSystemId)
+
+                    // Идемпотентность: повторный запрос с тем же payload (оригинал) → вернуть сохранённую маску
+                    payload == existing.original -> ProcessResponse(existing.mask)
+
+                    // Демаскирование: пришла маска → восстановить оригинал
+                    else -> unmask(payload, payloadId, existing, system, resolvedSystemId)
+                }
 
             metricsService.recordLatency(System.nanoTime() - start)
             return response
@@ -88,7 +92,12 @@ class ProcessService(
     /**
      * Маскирование: первый запрос с новым payload_id.
      */
-    private fun mask(payload: String, payloadId: String, system: SystemConfig, systemId: String): ProcessResponse {
+    private fun mask(
+        payload: String,
+        payloadId: String,
+        system: SystemConfig,
+        systemId: String,
+    ): ProcessResponse {
         val start = System.nanoTime()
         val maskedId = logMasker.maskPayloadId(payloadId)
         log.debug("Masking request, payloadId={}", maskedId)
@@ -108,12 +117,13 @@ class ProcessService(
         val maskingResult = maskingEngine.mask(payload, filtered, maskFormat)
 
         // Сохранение соответствия (идемпотентно), с привязкой к системе-владельцу
-        val record = CorrelationRecord(
-            original = payload,
-            mask = maskingResult.maskedText,
-            spans = maskingResult.spans,
-            systemId = systemId
-        )
+        val record =
+            CorrelationRecord(
+                original = payload,
+                mask = maskingResult.maskedText,
+                spans = maskingResult.spans,
+                systemId = systemId,
+            )
         correlationStore.save(payloadId, record)
 
         metricsService.recordMasking()
@@ -124,7 +134,13 @@ class ProcessService(
     /**
      * Демаскирование: второй запрос с тем же payload_id.
      */
-    private fun unmask(payload: String, payloadId: String, record: CorrelationRecord, system: SystemConfig, systemId: String): ProcessResponse {
+    private fun unmask(
+        payload: String,
+        payloadId: String,
+        record: CorrelationRecord,
+        system: SystemConfig,
+        systemId: String,
+    ): ProcessResponse {
         val start = System.nanoTime()
         log.debug("Unmasking request, payloadId={}", logMasker.maskPayloadId(payloadId))
 

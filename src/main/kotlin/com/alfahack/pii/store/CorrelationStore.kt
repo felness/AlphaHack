@@ -4,14 +4,16 @@ package com.alfahack.pii.store
  * Хранилище соответствий «маскирование → демаскирование» по payload_id.
  */
 interface CorrelationStore {
-
     /**
      * Сохранить запись соответствия.
      * Идемпотентно: если запись уже существует, возвращает существующую.
      *
      * @return true, если запись создана; false, если уже существовала
      */
-    fun save(payloadId: String, record: CorrelationRecord): Boolean
+    fun save(
+        payloadId: String,
+        record: CorrelationRecord,
+    ): Boolean
 
     /**
      * Получить запись соответствия по payload_id.

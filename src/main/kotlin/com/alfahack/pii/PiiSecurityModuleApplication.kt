@@ -7,5 +7,5 @@ import org.springframework.boot.runApplication
 class PiiSecurityModuleApplication
 
 fun main(args: Array<String>) {
-	runApplication<PiiSecurityModuleApplication>(*args)
+    runApplication<PiiSecurityModuleApplication>(*args)
 }

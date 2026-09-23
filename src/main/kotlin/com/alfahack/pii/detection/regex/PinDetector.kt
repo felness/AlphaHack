@@ -17,7 +17,6 @@ import java.util.regex.Pattern
  */
 @Component
 class PinDetector : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.PIN)
 
     private val pattern: Pattern = Pattern.compile(PIN_REGEX, Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CHARACTER_CLASS)
@@ -35,8 +34,8 @@ class PinDetector : Detector {
                     end = matcher.end(1),
                     confidence = 0.9,
                     source = DetectorSource.REGEX,
-                    validated = true
-                )
+                    validated = true,
+                ),
             )
         }
 

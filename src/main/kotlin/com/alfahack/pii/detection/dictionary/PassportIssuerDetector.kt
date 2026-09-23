@@ -15,9 +15,8 @@ import java.util.regex.Pattern
  */
 @Component
 class PassportIssuerDetector(
-    private val contextRules: ContextRules
+    private val contextRules: ContextRules,
 ) : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.PASSPORT_ISSUER)
 
     private val pattern: Pattern = Pattern.compile(ISSUER_REGEX, Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CHARACTER_CLASS)
@@ -39,8 +38,8 @@ class PassportIssuerDetector(
                         end = end,
                         confidence = 0.85,
                         source = DetectorSource.DICTIONARY,
-                        validated = true
-                    )
+                        validated = true,
+                    ),
                 )
             }
         }

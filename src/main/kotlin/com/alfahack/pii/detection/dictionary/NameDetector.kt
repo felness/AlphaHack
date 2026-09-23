@@ -17,9 +17,8 @@ import java.util.regex.Pattern
  */
 @Component
 class NameDetector(
-    private val contextRules: ContextRules
+    private val contextRules: ContextRules,
 ) : Detector {
-
     override val supportedTypes: Set<PiiType> = setOf(PiiType.FULL_NAME)
 
     private val pattern: Pattern = Pattern.compile(NAME_REGEX, Pattern.UNICODE_CHARACTER_CLASS)
@@ -43,8 +42,8 @@ class NameDetector(
                         end = end,
                         confidence = 0.85,
                         source = DetectorSource.DICTIONARY,
-                        validated = true
-                    )
+                        validated = true,
+                    ),
                 )
             }
         }

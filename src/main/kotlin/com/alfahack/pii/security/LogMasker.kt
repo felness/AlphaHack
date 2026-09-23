@@ -10,18 +10,13 @@ import org.springframework.stereotype.Component
  */
 @Component
 class LogMasker {
-
     /**
      * Замаскировать payload_id (хеш), чтобы не логировать возможные ПД.
      */
-    fun maskPayloadId(payloadId: String): String {
-        return "id:${payloadId.hashCode().toUInt().toString(16)}"
-    }
+    fun maskPayloadId(payloadId: String): String = "id:${payloadId.hashCode().toUInt().toString(16)}"
 
     /**
      * Сформировать безопасное сообщение о найденных типах ПД (без значений).
      */
-    fun typesSummary(types: Collection<Any>): String {
-        return types.joinToString(", ")
-    }
+    fun typesSummary(types: Collection<Any>): String = types.joinToString(", ")
 }

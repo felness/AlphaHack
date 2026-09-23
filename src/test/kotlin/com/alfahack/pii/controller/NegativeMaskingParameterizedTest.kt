@@ -21,7 +21,6 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 @AutoConfigureMockMvc
 @TestPropertySource(properties = ["pii.store.type=in-memory"])
 class NegativeMaskingParameterizedTest {
-
     @Autowired
     lateinit var mockMvc: MockMvc
 
@@ -31,14 +30,15 @@ class NegativeMaskingParameterizedTest {
         payload: String,
         payloadId: String,
         expectedResult: String,
-        category: String
+        category: String,
     ) {
-        val response = mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"$payload","payload_id":"$payloadId"}""")
-        )
-            .andReturn()
+        val response =
+            mockMvc
+                .perform(
+                    post("/process")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"payload":"$payload","payload_id":"$payloadId"}"""),
+                ).andReturn()
 
         assertEquals(200, response.response.status, "Request failed for [$category]: $payload")
         val actual = extractResult(response.response.contentAsString)

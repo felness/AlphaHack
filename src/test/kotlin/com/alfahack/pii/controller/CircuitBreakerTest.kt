@@ -30,11 +30,10 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
         "pii.store.type=redis",
         "resilience4j.circuitbreaker.instances.redisStore.minimum-number-of-calls=2",
         "resilience4j.circuitbreaker.instances.redisStore.failure-rate-threshold=50",
-        "resilience4j.circuitbreaker.instances.redisStore.sliding-window-size=2"
-    ]
+        "resilience4j.circuitbreaker.instances.redisStore.sliding-window-size=2",
+    ],
 )
 class CircuitBreakerTest {
-
     @Autowired
     lateinit var mockMvc: MockMvc
 
@@ -51,11 +50,13 @@ class CircuitBreakerTest {
 
         // Первые вызовы — ошибка Redis, затем circuit breaker открывается → 503
         repeat(3) {
-            val response = mockMvc.perform(
-                post("/process")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""{"payload":"паспорт 4509 123456","payload_id":"cb-$it"}""")
-            ).andReturn()
+            val response =
+                mockMvc
+                    .perform(
+                        post("/process")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""{"payload":"паспорт 4509 123456","payload_id":"cb-$it"}"""),
+                    ).andReturn()
             // После открытия circuit breaker — 503
             assertEquals(503, response.response.status)
         }

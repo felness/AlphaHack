@@ -14,17 +14,18 @@ import java.time.Duration
  */
 @Component
 class RateLimitService(
-    private val properties: PiiProperties
+    private val properties: PiiProperties,
 ) {
-
-    private val bucket: Bucket = Bucket.builder()
-        .addLimit(
-            Bandwidth.builder()
-                .capacity(properties.rateLimitRps.toLong())
-                .refillGreedy(properties.rateLimitRps.toLong(), Duration.ofSeconds(1))
-                .build()
-        )
-        .build()
+    private val bucket: Bucket =
+        Bucket
+            .builder()
+            .addLimit(
+                Bandwidth
+                    .builder()
+                    .capacity(properties.rateLimitRps.toLong())
+                    .refillGreedy(properties.rateLimitRps.toLong(), Duration.ofSeconds(1))
+                    .build(),
+            ).build()
 
     /**
      * Попытаться потребить один токен.

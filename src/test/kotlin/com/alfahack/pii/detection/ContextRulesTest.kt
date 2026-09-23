@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test
  * Тесты контекстных правил (позитивный/негативный контекст).
  */
 class ContextRulesTest {
-
     private val rules = ContextRules()
 
     @Test

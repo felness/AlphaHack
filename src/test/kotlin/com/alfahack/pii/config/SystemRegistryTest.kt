@@ -11,29 +11,33 @@ import org.junit.jupiter.api.Test
  * Тесты реестра систем (определение системы, фильтрация типов ПД).
  */
 class SystemRegistryTest {
-
-    private val properties = PiiProperties(
-        systems = mapOf(
-            "default" to PiiProperties.SystemConfig(
-                enabled = true,
-                maskingTypes = listOf("ALL"),
-                unmaskingEnabled = true,
-                maskFormat = "STAR"
-            ),
-            "system-a" to PiiProperties.SystemConfig(
-                enabled = true,
-                maskingTypes = listOf("EMAIL", "PHONE"),
-                unmaskingEnabled = true,
-                maskFormat = "STAR"
-            ),
-            "system-b" to PiiProperties.SystemConfig(
-                enabled = false,
-                maskingTypes = listOf("ALL"),
-                unmaskingEnabled = true,
-                maskFormat = "STAR"
-            )
+    private val properties =
+        PiiProperties(
+            systems =
+                mapOf(
+                    "default" to
+                        PiiProperties.SystemConfig(
+                            enabled = true,
+                            maskingTypes = listOf("ALL"),
+                            unmaskingEnabled = true,
+                            maskFormat = "STAR",
+                        ),
+                    "system-a" to
+                        PiiProperties.SystemConfig(
+                            enabled = true,
+                            maskingTypes = listOf("EMAIL", "PHONE"),
+                            unmaskingEnabled = true,
+                            maskFormat = "STAR",
+                        ),
+                    "system-b" to
+                        PiiProperties.SystemConfig(
+                            enabled = false,
+                            maskingTypes = listOf("ALL"),
+                            unmaskingEnabled = true,
+                            maskFormat = "STAR",
+                        ),
+                ),
         )
-    )
 
     private val registry = SystemRegistry(properties)
 

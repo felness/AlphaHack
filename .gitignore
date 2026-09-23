@@ -50,3 +50,7 @@ docs/skills/
 # Не заливаем на гит: конфиги содержат локальные пути и адреса
 docker-compose.monitoring.yml
 monitoring/
+
+### Локальный SonarQube сервер ###
+# Не заливаем на гит: локальный сервер анализа
+docker-compose.sonarqube.yml

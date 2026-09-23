@@ -20,22 +20,21 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 @TestPropertySource(
     properties = [
         "pii.store.type=in-memory",
-        "pii.max-payload-size=100"
-    ]
+        "pii.max-payload-size=100",
+    ],
 )
 class PayloadSizeTest {
-
     @Autowired
     lateinit var mockMvc: MockMvc
 
     @Test
     fun `payload within limit is accepted`() {
-        mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"паспорт 4509 123456","payload_id":"size-1"}""")
-        )
-            .andReturn()
+        mockMvc
+            .perform(
+                post("/process")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"payload":"паспорт 4509 123456","payload_id":"size-1"}"""),
+            ).andReturn()
             .let { assertEquals(200, it.response.status) }
     }
 
@@ -43,12 +42,12 @@ class PayloadSizeTest {
     fun `payload exceeding limit returns 400`() {
         // Payload длиной 150 символов (> 100)
         val longPayload = "x".repeat(150)
-        mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"$longPayload","payload_id":"size-2"}""")
-        )
-            .andReturn()
+        mockMvc
+            .perform(
+                post("/process")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"payload":"$longPayload","payload_id":"size-2"}"""),
+            ).andReturn()
             .let { assertEquals(400, it.response.status) }
     }
 }

@@ -21,11 +21,10 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 @TestPropertySource(
     properties = [
         "pii.store.type=in-memory",
-        "pii.rate-limit-rps=2"
-    ]
+        "pii.rate-limit-rps=2",
+    ],
 )
 class RateLimitTest {
-
     @Autowired
     lateinit var mockMvc: MockMvc
 
@@ -36,20 +35,24 @@ class RateLimitTest {
 
         // Первые 2 запроса — в пределах лимита (200)
         repeat(2) {
-            val response = mockMvc.perform(
-                post("/process")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""{"payload":"$payload","payload_id":"$payloadId"}""")
-            ).andReturn()
+            val response =
+                mockMvc
+                    .perform(
+                        post("/process")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""{"payload":"$payload","payload_id":"$payloadId"}"""),
+                    ).andReturn()
             assertEquals(200, response.response.status)
         }
 
         // Третий запрос — превышение лимита (429)
-        val limited = mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"$payload","payload_id":"$payloadId"}""")
-        ).andReturn()
+        val limited =
+            mockMvc
+                .perform(
+                    post("/process")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"payload":"$payload","payload_id":"$payloadId"}"""),
+                ).andReturn()
 
         assertEquals(429, limited.response.status)
         assertEquals("1", limited.response.getHeader("Retry-After"))

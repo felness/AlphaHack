@@ -24,11 +24,11 @@ import org.testcontainers.junit.jupiter.Testcontainers
 @SpringBootTest
 @AutoConfigureMockMvc
 class RedisIntegrationTest {
-
     companion object {
         @Container
-        val redis: GenericContainer<*> = GenericContainer("redis:7-alpine")
-            .withExposedPorts(6379)
+        val redis: GenericContainer<*> =
+            GenericContainer("redis:7-alpine")
+                .withExposedPorts(6379)
 
         @JvmStatic
         @DynamicPropertySource
@@ -48,24 +48,26 @@ class RedisIntegrationTest {
         val payloadId = "redis-1"
 
         // Шаг 1: маскирование
-        val maskResponse = mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"$payload","payload_id":"$payloadId"}""")
-        )
-            .andReturn()
+        val maskResponse =
+            mockMvc
+                .perform(
+                    post("/process")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"payload":"$payload","payload_id":"$payloadId"}"""),
+                ).andReturn()
 
         assertEquals(200, maskResponse.response.status)
         val mask = extractResult(maskResponse.response.contentAsString)
         assertEquals("паспорт **** ******, email ******@****.**", mask)
 
         // Шаг 2: демаскирование
-        val unmaskResponse = mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"$mask","payload_id":"$payloadId"}""")
-        )
-            .andReturn()
+        val unmaskResponse =
+            mockMvc
+                .perform(
+                    post("/process")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"payload":"$mask","payload_id":"$payloadId"}"""),
+                ).andReturn()
 
         assertEquals(200, unmaskResponse.response.status)
         assertEquals(payload, extractResult(unmaskResponse.response.contentAsString))
@@ -77,20 +79,24 @@ class RedisIntegrationTest {
         val payloadId = "redis-2"
 
         // Первый запрос — маскирование
-        val first = mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"$payload","payload_id":"$payloadId"}""")
-        ).andReturn()
+        val first =
+            mockMvc
+                .perform(
+                    post("/process")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"payload":"$payload","payload_id":"$payloadId"}"""),
+                ).andReturn()
         assertEquals(200, first.response.status)
         val firstMask = extractResult(first.response.contentAsString)
 
         // Повторный запрос с тем же payload_id и payload — та же маска
-        val second = mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"$payload","payload_id":"$payloadId"}""")
-        ).andReturn()
+        val second =
+            mockMvc
+                .perform(
+                    post("/process")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"payload":"$payload","payload_id":"$payloadId"}"""),
+                ).andReturn()
         assertEquals(200, second.response.status)
         assertEquals(firstMask, extractResult(second.response.contentAsString))
     }
@@ -98,12 +104,12 @@ class RedisIntegrationTest {
     @Test
     fun `unknown payload_id is treated as masking`() {
         // Запрос с неизвестным payload_id — это первый запрос (маскирование), возвращает 200
-        mockMvc.perform(
-            post("/process")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"payload":"some mask","payload_id":"unknown-id"}""")
-        )
-            .andReturn()
+        mockMvc
+            .perform(
+                post("/process")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"payload":"some mask","payload_id":"unknown-id"}"""),
+            ).andReturn()
             .let { assertEquals(200, it.response.status) }
     }
 

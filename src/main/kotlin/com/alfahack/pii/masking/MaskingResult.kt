@@ -10,5 +10,5 @@ import com.alfahack.pii.store.MaskedSpan
  */
 data class MaskingResult(
     val maskedText: String,
-    val spans: List<MaskedSpan>
+    val spans: List<MaskedSpan>,
 )
