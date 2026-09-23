@@ -29,7 +29,7 @@ docker compose up -d redis
 ### 2. Сборка и запуск сервиса
 
 ```bash
-./gradlew bootJar
+gradle bootJar
 java -jar build/libs/pii-security-module-0.0.1-SNAPSHOT.jar --server.port=8080
 ```
 

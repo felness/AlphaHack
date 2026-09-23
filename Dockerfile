@@ -3,25 +3,20 @@
 # =============================================================================
 # Build stage — компиляция Kotlin/Spring Boot приложения
 # =============================================================================
-FROM eclipse-temurin:21-jdk-jammy AS builder
+FROM gradle:jdk21 AS builder
 WORKDIR /app
 
-# Копируем Gradle wrapper и build-файлы для кэширования зависимостей
-COPY gradlew gradlew.bat ./
-COPY gradle ./gradle
+# Копируем build-файлы для кэширования зависимостей
 COPY build.gradle.kts settings.gradle.kts ./
 
-# Делаем gradlew executable
-RUN chmod +x gradlew
-
 # Скачиваем зависимости (кэшируемый слой)
-RUN ./gradlew dependencies --no-daemon || true
+RUN gradle dependencies --no-daemon || true
 
 # Копируем исходники
 COPY src ./src
 
 # Собираем jar (без тестов для скорости)
-RUN ./gradlew bootJar -x test --no-daemon && \
+RUN gradle bootJar -x test --no-daemon && \
     mv build/libs/*.jar app.jar
 
 # =============================================================================

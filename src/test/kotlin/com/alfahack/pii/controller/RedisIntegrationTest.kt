@@ -20,7 +20,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
  * Поднимает Redis-контейнер, проверяет полный цикл маскирование → демаскирование,
  * идемпотентность и TTL.
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest
 @AutoConfigureMockMvc
 class RedisIntegrationTest {
