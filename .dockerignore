@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+
+# Документация
+README.md
+docs/
+*.md
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Сборка
+build/
+.gradle/
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Логи
+*.log
+
+# ТЗ (материалы хакатона)
+ds.pdf
+rule.md
+
+# Скиллы
+docs/skills/
+
+# Нагрузочный тест
+load_test.py

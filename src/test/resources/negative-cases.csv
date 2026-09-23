@@ -1,0 +1,27 @@
+payload;payload_id;expected_result;category
+паспорт 4509 12345;neg-01;паспорт 4509 12345;PASSPORT_SERIES_NUMBER_INVALID
+паспорт 4509 1234567;neg-02;паспорт 4509 1234567;PASSPORT_SERIES_NUMBER_INVALID
+паспорт 450 123456;neg-03;паспорт 450 123456;PASSPORT_SERIES_NUMBER_INVALID
+ivanov@mail;neg-04;ivanov@mail;EMAIL_INVALID
+ivanov@.ru;neg-05;ivanov@.ru;EMAIL_INVALID
+ivanov@mail.r;neg-06;ivanov@mail.r;EMAIL_INVALID
+900123456;neg-07;900123456;PHONE_INVALID
++7 900 123 45;neg-08;+7 900 123 45;PHONE_INVALID
+770123456789;neg-09;770123456789;INN_INVALID
+1234567890;neg-10;1234567890;INN_INVALID
+4276 1234 5678 9012;neg-11;4276 1234 5678 9012;CARD_INVALID
+1234 5678 9012 3456;neg-12;1234 5678 9012 3456;CARD_INVALID
+дата рождения 12.05.90;neg-13;дата рождения 12.05.90;DATE_INVALID
+поэт Александр Пушкин;neg-14;поэт Александр Пушкин;CONTEXT_NEGATIVE
+писатель Лев Толстой;neg-15;писатель Лев Толстой;CONTEXT_NEGATIVE
+отделение Банка по адресу г. Москва, ул. Тверская, д. 1;neg-16;отделение Банка по адресу г. Москва, ул. Тверская, д. 1;CONTEXT_NEGATIVE
+Александр Пушкин;neg-17;Александр Пушкин;CONTEXT_NEGATIVE
+г. Москва;neg-19;г. Москва;PLACE_OF_BIRTH_NO_CONTEXT
+гражданин;neg-20;гражданин;CITIZENSHIP_INVALID
+ОУФМС России по г. Москве;neg-21;ОУФМС России по г. Москве;PASSPORT_ISSUER_NO_CONTEXT
+770-001;neg-22;770-001;PASSPORT_DEPARTMENT_CODE_NO_CONTEXT
+77 12 345678;neg-23;77 12 345678;DRIVER_LICENSE_NO_CONTEXT
+г. Москва, ул. Тверская, д. 1;neg-24;г. Москва, ул. Тверская, д. 1;ADDRESS_NO_CONTEXT
+123;neg-25;123;CVV_NO_CONTEXT
+1234;neg-26;1234;PIN_NO_CONTEXT
+IVANOV IVAN;neg-27;IVANOV IVAN;CARD_HOLDER_NO_CONTEXT
