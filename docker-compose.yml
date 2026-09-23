@@ -19,7 +19,7 @@ services:
     environment:
       - HOST=0.0.0.0
       - PORT=8000
-      - WORKERS=8
+      - WORKERS=4
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - ALLOWED_SYSTEMS=default,test,prod
