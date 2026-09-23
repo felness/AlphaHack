@@ -58,6 +58,26 @@ RUSSIAN_NAMES = {
     "семён", "семен", "сергей", "софья", "софия", "станислав", "степан",
     "тамара", "татьяна", "тимофей", "фёдор", "федор", "юлия", "юрий",
     "яков", "ярослав",
+    # Дополнительные имена для повышения recall
+    "аркадий", "аркадия", "гурген", "зульфия", "захар",
+    "ильдар", "ильдаровна", "ашот", "ашотович", "тигран", "армен",
+    "артур", "эдуард", "эльвира", "эльмира", "альберт", "альбина",
+    "азат", "аида", "айрат", "алина", "алиса", "алла",
+    "амалия", "амина", "анастасия", "ангелина", "анита",
+    "арина", "асия", "аэлита", "белла", "валентина",
+    "василиса", "венера", "вероника", "виолетта", "владислава",
+    "гаянэ", "гузель", "гульнара", "гульфия", "дана", "дарина", "диана",
+    "дина", "диляра", "евдокия", "жанна", "зарина", "земфира", "зинаида",
+    "злата", "зухра", "ильмира", "ильсияр", "инга", "инесса", "иоланта",
+    "карина", "каролина", "кира", "клара", "кристина", "лада",
+    "лиана", "лидия", "лилия", "лина", "мадина", "майя", "маргарита",
+    "марианна", "марта", "милана", "милена", "мирослава",
+    "наиля", "нелли", "нонна", "оксана", "олеся",
+    "рада", "регина", "рената", "римма",
+    "роза", "роксана", "руфина", "сабина", "саида", "севиль",
+    "сильвия", "снежана", "ульяна", "фаина",
+    "фарида", "фатима", "эвелина", "элеонора", "элина", "эльза", "эмилия",
+    "эмма", "яна", "ярослава",
 }
 
 # Распространённые русские отчества
@@ -165,7 +185,7 @@ ADDRESS_KEYWORDS = {
     "область", "обл", "край", "республика", "район", "р-н", "улица", "ул.",
     "ул ", "проспект", "пр-т", "проезд", "переулок", "пер.", "бульвар",
     "б-р", "шоссе", "набережная", "наб.", "аллея", "дом", "д.", "корпус",
-    "корп.", "строение", "стр.", "квартира", "кв.", "кв ", "офис", "помещение",
+    "корп.", "строение", "стр.", "квартира", "кв.", "кв ", "помещение",
     "пом.", "индекс", "почтовый индекс",
 }
 
@@ -281,6 +301,25 @@ EMAIL_KEYWORDS = {
     "электронный адрес", "email:", "e-mail:", "почта:",
 }
 
+# Известные персоны, которые НЕ являются ПД (литературный/исторический контекст)
+FAMOUS_PERSONS = {
+    "пушкин", "лермонтов", "толстой", "достоевский", "чехов", "гоголь",
+    "тургенев", "есенин", "маяковский", "блок", "ахматова", "цветаева",
+    "пастернак", "булгаков", "набоков", "солженицын", "горький", "островский",
+    "крилов", "крылов", "грибоедов", "фонвизин", "державин", "тютчев",
+    "фет", "некрасов", "брюсов", "гумилёв", "гумилев", "заболоцкий",
+    "твардовский", "шолохов", "паустовский", "пришвин", "куприн", "бунин",
+    "андреев", "кузмин", "белый", "ильф",
+    "глинка", "чайковский", "рахманинов", "мусоргский", "бородин", "римский-корсаков",
+    "прокофьев", "шостакович", "стравинский", "скрябин", "кабалевский",
+    "репин", "айвазовский", "шишкин", "левитан", "серов", "васнецов",
+    "малевич", "кандинский", "шагал", "рорих", "рерих",
+    "менделеев", "ломоносов", "павлов", "циолковский", "королёв", "королев",
+    "гагарин", "терёшкина", "терешкина", "попов", "кулибин", "ползунов",
+    "суворов", "кутузов", "жуков", "нахимов", "ушаков", "невский",
+    "донской",
+}
+
 # ---------------------------------------------------------------------------
 # Regex-паттерны
 # ---------------------------------------------------------------------------
@@ -337,6 +376,21 @@ DATE_TEXT_RE = re.compile(
     r"(?<!\d)(?:\d{1,2}\s+(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)\s+\d{4})(?!\d)"
 )
 
+
+def _luhn_valid(number: str) -> bool:
+    """Проверяет номер карты по алгоритму Луна."""
+    digits = [int(d) for d in number if d.isdigit()]
+    if len(digits) < 13:
+        return False
+    checksum = 0
+    for i, d in enumerate(reversed(digits)):
+        if i % 2 == 1:
+            d *= 2
+            if d > 9:
+                d -= 9
+        checksum += d
+    return checksum % 10 == 0
+
 # ---------------------------------------------------------------------------
 # Детекторы
 # ---------------------------------------------------------------------------
@@ -354,7 +408,14 @@ def detect_inn(text: str) -> list[Match]:
 
 
 def detect_card_number(text: str) -> list[Match]:
-    return [Match("card_number", m.start(), m.end(), m.group()) for m in CARD_RE.finditer(text)]
+    matches = []
+    for m in CARD_RE.finditer(text):
+        # Проверяем по алгоритму Луна ИЛИ наличие ключевого слова "карта" рядом
+        context = text[max(0, m.start() - 30):m.end() + 10].lower()
+        has_card_kw = any(kw in context for kw in CARD_KEYWORDS)
+        if _luhn_valid(m.group()) or has_card_kw:
+            matches.append(Match("card_number", m.start(), m.end(), m.group()))
+    return matches
 
 
 def detect_cvv(text: str) -> list[Match]:
@@ -459,46 +520,91 @@ def detect_issue_date(text: str) -> list[Match]:
     return _dedupe(matches)
 
 
+def _is_famous_person(words: list[str]) -> bool:
+    """Проверяет, является ли последовательность слов известной персоной."""
+    return any(w in FAMOUS_PERSONS for w in words)
+
+
+# Суффиксы отчеств и фамилий для морфологического распознавания
+_PATRONYMIC_SUFFIXES = (
+    "ович", "евич", "ич", "овна", "евна", "ична", "инична",
+)
+_SURNAME_SUFFIXES = (
+    "ов", "ёв", "ев", "ин", "ын", "ский", "цкий", "ская", "цкая",
+    "ко", "ук", "юк", "ян", "швили", "дзе", "оглы", "уллин", "баев",
+    "ова", "ёва", "ева", "ина", "ына", "ских", "цких",
+)
+
+
+def _is_patronymic(word: str) -> bool:
+    """Проверяет, похоже ли слово на отчество по суффиксу."""
+    if len(word) < 4:
+        return False
+    return word.endswith(_PATRONYMIC_SUFFIXES)
+
+
+def _is_surname(word: str) -> bool:
+    """Проверяет, похоже ли слово на фамилию по суффиксу."""
+    if len(word) < 4:
+        return False
+    return word.endswith(_SURNAME_SUFFIXES)
+
+
 def detect_fio(text: str) -> list[Match]:
-    """Детектор ФИО на основе словарей имён/отчеств/фамилий."""
+    """Детектор ФИО на основе словарей + морфологических суффиксных правил."""
     matches = []
     # Строим позиции слов
     positions = []
     for m in re.finditer(r"[А-ЯЁа-яё]+", text):
         positions.append((m.start(), m.end(), m.group().lower()))
 
+    def _famous_after(end_idx: int) -> bool:
+        """Проверяет, является ли слово после позиции известной персоной."""
+        for j in range(end_idx + 1, len(positions)):
+            if positions[j][2] in FAMOUS_PERSONS:
+                return True
+            break
+        return False
+
     for i in range(len(positions)):
         start, _, w = positions[i]
+        is_name = w in RUSSIAN_NAMES
+        is_surname = w in RUSSIAN_SURNAMES or _is_surname(w)
         # Имя + отчество
-        if w in RUSSIAN_NAMES and i + 1 < len(positions):
+        if is_name and i + 1 < len(positions):
             _, end2, w2 = positions[i + 1]
-            if w2 in RUSSIAN_PATRONYMICS:
+            if (w2 in RUSSIAN_PATRONYMICS or _is_patronymic(w2)) and not _is_famous_person([w, w2]) and not _famous_after(i + 1):
                 matches.append(Match("fio", start, end2, text[start:end2]))
         # Имя + фамилия (2 слова)
-        if w in RUSSIAN_NAMES and i + 1 < len(positions):
+        if is_name and i + 1 < len(positions):
             _, end2, w2 = positions[i + 1]
-            if w2 in RUSSIAN_SURNAMES:
+            if (w2 in RUSSIAN_SURNAMES or _is_surname(w2)) and not _is_famous_person([w, w2]) and not _famous_after(i + 1):
                 matches.append(Match("fio", start, end2, text[start:end2]))
         # Фамилия + имя (2 слова)
-        if w in RUSSIAN_SURNAMES and i + 1 < len(positions):
+        if is_surname and i + 1 < len(positions):
             _, end2, w2 = positions[i + 1]
-            if w2 in RUSSIAN_NAMES:
+            if w2 in RUSSIAN_NAMES and not _is_famous_person([w, w2]) and not _famous_after(i + 1):
                 matches.append(Match("fio", start, end2, text[start:end2]))
         # Фамилия + имя + отчество
-        if w in RUSSIAN_SURNAMES and i + 2 < len(positions):
+        if is_surname and i + 2 < len(positions):
             _, end2, w2 = positions[i + 1]
             _, end3, w3 = positions[i + 2]
-            if w2 in RUSSIAN_NAMES and w3 in RUSSIAN_PATRONYMICS:
+            if w2 in RUSSIAN_NAMES and (w3 in RUSSIAN_PATRONYMICS or _is_patronymic(w3)) and not _is_famous_person([w, w2, w3]) and not _famous_after(i + 2):
                 matches.append(Match("fio", start, end3, text[start:end3]))
 
     return _dedupe(matches)
 
 
 def _find_address_keywords(lower: str) -> list[tuple[int, int]]:
-    """Находит и объединяет близкие ключевые слова адреса."""
+    """Находит и объединяет близкие ключевые слова адреса (с границами слов)."""
     kw_positions = []
     for kw in ADDRESS_KEYWORDS:
-        for m in re.finditer(re.escape(kw), lower):
+        # Сокращения с точкой (г., ул., д.) — ищем с точкой, без \b после
+        if kw.endswith("."):
+            pattern = re.escape(kw)
+        else:
+            pattern = r"\b" + re.escape(kw) + r"\b"
+        for m in re.finditer(pattern, lower):
             kw_positions.append((m.start(), m.end()))
 
     kw_positions.sort(key=lambda x: x[0])
@@ -523,16 +629,32 @@ def _expand_address_end(text: str, end: int) -> int:
     return end_ext
 
 
+# Ключевые слова, указывающие на адрес отделения/организации (НЕ ПД)
+_NON_PII_ADDRESS_CONTEXT = {
+    "банк", "банка", "банке", "отделение", "отделения", "офис", "офиса",
+    "филиал", "филиала", "магазин", "магазина", "салон", "салона",
+    "клиника", "клиники", "больница", "больницы", "школа", "школы",
+    "университет", "университета", "институт", "института", "завод",
+    "завода", "фабрика", "фабрики", "компания", "компании", "фирма",
+    "фирмы", "организация", "организации", "предприятие", "предприятия",
+}
+
+
 def detect_address(text: str) -> list[Match]:
     """Детектор адреса на основе ключевых слов.
 
     Захватывает адрес целиком от первого ключевого слова (город/улица/дом и т.п.)
-    до конца предложения или до разделителя (запятая перед следующим контекстом).
+    до конца предложения или до разделителя. Маскирует только значение, не метку.
+    Пропускает адреса отделений/организаций (НЕ ПД).
     """
     matches = []
     lower = text.lower()
 
     for start, end in _find_address_keywords(lower):
+        # Пропускаем адреса отделений/организаций (НЕ ПД)
+        context_before = lower[max(0, start - 40):start]
+        if any(kw in context_before for kw in _NON_PII_ADDRESS_CONTEXT):
+            continue
         end_ext = _expand_address_end(text, end)
         value = text[start:end_ext].strip()
         if value:
@@ -548,7 +670,7 @@ def detect_address(text: str) -> list[Match]:
 
 
 def detect_citizenship(text: str) -> list[Match]:
-    """Детектор гражданства."""
+    """Детектор гражданства. Маскирует только значение, не метку."""
     matches = []
     lower = text.lower()
     for kw in CITIZENSHIP_KEYWORDS:
@@ -558,21 +680,26 @@ def detect_citizenship(text: str) -> list[Match]:
             after_lower = after.lower()
             for country in COUNTRIES:
                 if country in after_lower:
-                    start = m.start()
-                    end = m.end() + after_lower.find(country) + len(country)
+                    # Маскируем только значение (после метки), не метку
+                    start = m.end() + after_lower.find(country)
+                    end = start + len(country)
                     matches.append(Match("citizenship", start, end, text[start:end]))
                     break
     return _dedupe(matches)
 
 
 def detect_birth_place(text: str) -> list[Match]:
-    """Детектор места рождения."""
+    """Детектор места рождения. Маскирует только значение, не метку."""
     matches = []
     lower = text.lower()
     for kw in BIRTH_PLACE_KEYWORDS:
         for m in re.finditer(re.escape(kw), lower):
-            # Расширяем до конца предложения
-            start = m.start()
+            # Пропускаем, если после ключевого слова идёт дата (это дата рождения)
+            after = text[m.end():m.end() + 30]
+            if DATE_RE.search(after) or DATE_TEXT_RE.search(after):
+                continue
+            # Маскируем только значение (после метки), не метку
+            start = m.end()
             end = min(len(text), m.end() + 60)
             sentence_end = text.find(".", m.end())
             if sentence_end != -1 and sentence_end < end:
@@ -584,12 +711,18 @@ def detect_birth_place(text: str) -> list[Match]:
 
 
 def detect_passport_issuer(text: str) -> list[Match]:
-    """Детектор органа, выдавшего паспорт."""
+    """Детектор органа, выдавшего паспорт. Маскирует только значение, не метку."""
     matches = []
     lower = text.lower()
     for kw in ISSUER_KEYWORDS:
-        for m in re.finditer(re.escape(kw), lower):
-            start = m.start()
+        pattern = r"\b" + re.escape(kw) + r"\b"
+        for m in re.finditer(pattern, lower):
+            # Пропускаем, если после ключевого слова идёт организация (НЕ орган выдачи)
+            after = text[m.end():m.end() + 30].lower()
+            if any(org in after for org in _NON_PII_ADDRESS_CONTEXT):
+                continue
+            # Маскируем только значение (после метки), не метку
+            start = m.end()
             end = min(len(text), m.end() + 80)
             sentence_end = text.find(".", m.end())
             if sentence_end != -1 and sentence_end < end:
@@ -601,18 +734,23 @@ def detect_passport_issuer(text: str) -> list[Match]:
 
 
 def detect_card_holder(text: str) -> list[Match]:
-    """Детектор имени держателя карты."""
+    """Детектор имени держателя карты. Маскирует только значение, не метку."""
     matches = []
     lower = text.lower()
     for kw in CARD_HOLDER_KEYWORDS:
         for m in re.finditer(re.escape(kw), lower):
             after = text[m.end():m.end() + 40]
             # Ищем латинские слова (имя на карте обычно латиницей)
-            for wm in re.finditer(r"[A-Za-z]+", after):
-                start = m.start()
-                end = m.end() + wm.end()
-                matches.append(Match("card_holder", start, end, text[start:end]))
-                break
+            words = list(re.finditer(r"[A-Za-z]+", after))
+            if not words:
+                continue
+            # Захватываем до 2 слов (имя + фамилия)
+            end = words[0].end()
+            if len(words) > 1 and words[1].start() - words[0].end() <= 2:
+                end = words[1].end()
+            # Маскируем только значение (после метки), не метку
+            start = m.end() + words[0].start()
+            matches.append(Match("card_holder", start, m.end() + end, text[start:m.end() + end]))
     return _dedupe(matches)
 
 

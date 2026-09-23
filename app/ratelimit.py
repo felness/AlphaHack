@@ -52,4 +52,10 @@ class RateLimiter:
 
 
 # Глобальный экземпляр. Лимит по умолчанию — 1000 RPS на систему.
-rate_limiter = RateLimiter(max_requests=1000, window_sec=1.0)
+from .config import get_settings
+
+_settings = get_settings()
+rate_limiter = RateLimiter(
+    max_requests=_settings.rate_limit_rps,
+    window_sec=_settings.rate_limit_window_sec,
+)

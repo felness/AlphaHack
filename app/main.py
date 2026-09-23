@@ -6,11 +6,12 @@
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 from .config import get_settings
@@ -41,10 +42,11 @@ app = FastAPI(
 
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
-    """Собирает метрики latency/RPS для каждого запроса."""
+    """Собирает метрики latency/RPS и ограничивает время обработки запроса."""
     start = time.monotonic()
+    timeout = get_settings().request_timeout_sec
     try:
-        response = await call_next(request)
+        response = await asyncio.wait_for(call_next(request), timeout=timeout)
         latency = time.monotonic() - start
         tokens = 0
         if request.url.path == "/process":
@@ -56,6 +58,11 @@ async def metrics_middleware(request: Request, call_next):
                 logger.warning("Не удалось прочитать тело запроса: %s", exc)
         metrics.record_request(latency, tokens, error=response.status_code >= 500)
         return response
+    except asyncio.TimeoutError:
+        latency = time.monotonic() - start
+        metrics.record_request(latency, error=True)
+        logger.warning("Таймаут обработки запроса %s %s", request.method, request.url.path)
+        return JSONResponse(status_code=504, content={"detail": "Request timeout"})
     except Exception:
         latency = time.monotonic() - start
         metrics.record_request(latency, error=True)
@@ -134,7 +141,11 @@ async def process(
         logger.warning("Демаскирование запрещено для system_id=%s", x_system_id)
         raise HTTPException(status_code=403, detail="Unmasking not allowed for this system")
     logger.info("Демаскирование payload_id=%s", req.payload_id)
-    # Определяем режим по сохранённым span (есть токены → детокенизация)
+    # Если пришла наша маска — возвращаем сохранённый оригинал напрямую (100% точность)
+    if req.payload == existing.masked_text:
+        logger.info("Демаскирование по сохранённому оригиналу payload_id=%s", req.payload_id)
+        return ProcessResponse(result=existing.original_text)
+    # Иначе — фоллбэк: восстановление по позициям/токенам
     has_tokens = any(s.token for s in existing.spans)
     if has_tokens:
         result = detokenize_text(req.payload, existing.spans)

@@ -5,6 +5,7 @@
 - label: человекочитаемое название
 - mask_char: символ маскирования
 - keep_edges: сколько символов оставить видимыми с начала/конца
+- mask_strategy: стратегия маскирования (stars | initials | preserve_separators)
 """
 from dataclasses import dataclass
 
@@ -16,24 +17,40 @@ class PiiType:
     mask_char: str = "*"
     keep_start: int = 0   # сколько символов оставить в начале
     keep_end: int = 0     # сколько символов оставить в конце
+    mask_strategy: str = "stars"  # stars | initials | preserve_separators
 
 
 # Все поддерживаемые типы ПД из ТЗ
 PII_TYPES: dict[str, PiiType] = {
-    "fio": PiiType("fio", "ФИО", keep_start=1, keep_end=0),
+    "fio": PiiType("fio", "ФИО", mask_strategy="initials"),
     "birth_date": PiiType("birth_date", "Дата рождения"),
     "birth_place": PiiType("birth_place", "Место рождения"),
-    "passport_series_number": PiiType("passport_series_number", "Серия и номер паспорта", keep_start=2, keep_end=2),
+    "passport_series_number": PiiType(
+        "passport_series_number", "Серия и номер паспорта",
+        keep_start=2, keep_end=2, mask_strategy="preserve_separators",
+    ),
     "citizenship": PiiType("citizenship", "Гражданство"),
     "passport_issuer": PiiType("passport_issuer", "Орган, выдавший паспорт"),
-    "passport_department_code": PiiType("passport_department_code", "Код подразделения", keep_start=2, keep_end=2),
+    "passport_department_code": PiiType(
+        "passport_department_code", "Код подразделения",
+        keep_start=2, keep_end=2, mask_strategy="preserve_separators",
+    ),
     "passport_issue_date": PiiType("passport_issue_date", "Дата выдачи паспорта"),
-    "driver_license": PiiType("driver_license", "Серия и номер водительского удостоверения", keep_start=2, keep_end=2),
+    "driver_license": PiiType(
+        "driver_license", "Серия и номер водительского удостоверения",
+        keep_start=2, keep_end=2, mask_strategy="preserve_separators",
+    ),
     "address": PiiType("address", "Адрес"),
     "email": PiiType("email", "Email", keep_start=1, keep_end=1),
-    "phone": PiiType("phone", "Номер телефона", keep_start=2, keep_end=2),
+    "phone": PiiType(
+        "phone", "Номер телефона",
+        keep_start=2, keep_end=2, mask_strategy="preserve_separators",
+    ),
     "inn": PiiType("inn", "ИНН", keep_start=2, keep_end=2),
-    "card_number": PiiType("card_number", "Номер платёжной банковской карты", keep_start=4, keep_end=4),
+    "card_number": PiiType(
+        "card_number", "Номер платёжной банковской карты",
+        keep_start=4, keep_end=4, mask_strategy="preserve_separators",
+    ),
     "cvv": PiiType("cvv", "CVV-код"),
     "pin": PiiType("pin", "Пин-код карты"),
     "card_holder": PiiType("card_holder", "Имя держателя карты"),

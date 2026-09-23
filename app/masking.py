@@ -29,19 +29,60 @@ class MaskResult:
     spans: list[MaskedSpan] = field(default_factory=list)
 
 
-def _mask_value(value: str, pii_type: PiiType) -> str:
-    """Маскирует значение, сохраняя длину и края."""
+def _mask_stars(value: str, pii_type: PiiType) -> str:
+    """Маскирует значение звёздочками, сохраняя длину и края."""
     n = len(value)
     keep_start = min(pii_type.keep_start, n)
     keep_end = min(pii_type.keep_end, n - keep_start)
     if keep_start + keep_end >= n:
-        # слишком короткое значение — маскируем всё
         return pii_type.mask_char * n
     return (
         value[:keep_start]
         + pii_type.mask_char * (n - keep_start - keep_end)
         + value[n - keep_end:]
     )
+
+
+def _mask_initials(value: str, pii_type: PiiType) -> str:
+    """Маскирует ФИО инициалами: 'Иванов Иван Иванович' -> 'И. И. И.'."""
+    words = [w for w in value.split() if w]
+    if not words:
+        return value
+    initials = " ".join(w[0] + "." for w in words if w[0].isalpha())
+    return initials if initials else pii_type.mask_char * len(value)
+
+
+def _mask_preserve_separators(value: str, pii_type: PiiType) -> str:
+    """Маскирует цифры, сохраняя разделители (пробелы/дефисы/скобки).
+
+    '4509 123456' -> '45** ****56'
+    '+7 900 123-45-67' -> '+7 *** ***-**-**'
+    """
+    keep_start = pii_type.keep_start
+    keep_end = pii_type.keep_end
+    result = []
+    digit_count = 0
+    total_digits = sum(1 for c in value if c.isdigit())
+    for ch in value:
+        if ch.isdigit():
+            digit_count += 1
+            if digit_count <= keep_start or digit_count > total_digits - keep_end:
+                result.append(ch)
+            else:
+                result.append(pii_type.mask_char)
+        else:
+            result.append(ch)
+    return "".join(result)
+
+
+def _mask_value(value: str, pii_type: PiiType) -> str:
+    """Маскирует значение по стратегии типа ПД."""
+    strategy = pii_type.mask_strategy
+    if strategy == "initials":
+        return _mask_initials(value, pii_type)
+    if strategy == "preserve_separators":
+        return _mask_preserve_separators(value, pii_type)
+    return _mask_stars(value, pii_type)
 
 
 def _filter_matches(matches: list[Match], mask_types: list[str] | None) -> list[Match]:
