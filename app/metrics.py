@@ -42,6 +42,7 @@ class Metrics:
     def record_request(self, latency_sec: float, tokens: int = 0, error: bool = False) -> None:
         """Записывает метрику запроса в Redis."""
         now = time.time()
+        worker_id = os.getpid()
         try:
             pipe = self._redis.pipeline()
             pipe.incr(_TOTAL_REQUESTS)
@@ -49,12 +50,12 @@ class Metrics:
                 pipe.incr(_TOTAL_ERRORS)
             if tokens > 0:
                 pipe.incrby(_TOTAL_TOKENS, tokens)
-                pipe.zadd(_TPS_WINDOW, {str(now): tokens})
-            pipe.zadd(_RPS_WINDOW, {str(now): 1})
+                pipe.zadd(_TPS_WINDOW, {f"{worker_id}:{now}": tokens})
+            pipe.zadd(_RPS_WINDOW, {f"{worker_id}:{now}": now})
             latency_ms = latency_sec * 1000
             pipe.incrbyfloat(_LATENCY_SUM, latency_ms)
             pipe.incr(_LATENCY_COUNT)
-            pipe.zadd(_LATENCY_P95, {str(now): latency_ms})
+            pipe.zadd(_LATENCY_P95, {f"{worker_id}:{now}": latency_ms})
             # Ограничиваем размер ZSET для p95 (храним последние 10000)
             pipe.zremrangebyrank(_LATENCY_P95, 0, -10001)
             pipe.execute()
@@ -76,8 +77,17 @@ class Metrics:
     def rps(self) -> float:
         """Запросов в секунду за окно."""
         try:
+            now = time.time()
+            cutoff = now - self._window
+            # Удаляем устаревшие
+            self._redis.zremrangebyscore(_RPS_WINDOW, 0, cutoff)
             count = self._redis.zcard(_RPS_WINDOW)
-            return count / self._window
+            # Считаем за фактическое время окна
+            oldest = self._redis.zrange(_RPS_WINDOW, 0, 0, withscores=True)
+            if not oldest:
+                return 0.0
+            elapsed = max(1.0, now - oldest[0][1])
+            return count / elapsed
         except Exception as exc:  # noqa: BLE001
             logger.warning("Не удалось получить RPS: %s", exc)
             return 0.0
@@ -85,8 +95,16 @@ class Metrics:
     def tps(self) -> float:
         """Токенов в секунду за окно."""
         try:
-            total = sum(float(v) for v in self._redis.zrange(_TPS_WINDOW, 0, -1, withscores=True))
-            return total / self._window
+            now = time.time()
+            cutoff = now - self._window
+            self._redis.zremrangebyscore(_TPS_WINDOW, 0, cutoff)
+            entries = self._redis.zrange(_TPS_WINDOW, 0, -1, withscores=True)
+            if not entries:
+                return 0.0
+            total = sum(float(score) for _, score in entries)
+            oldest = entries[0][1]
+            elapsed = max(1.0, now - oldest)
+            return total / elapsed
         except Exception as exc:  # noqa: BLE001
             logger.warning("Не удалось получить TPS: %s", exc)
             return 0.0
@@ -104,7 +122,7 @@ class Metrics:
     def p95_latency_ms(self) -> float:
         """P95 latency в мс."""
         try:
-            values = [float(v) for v in self._redis.zrange(_LATENCY_P95, 0, -1, withscores=True)]
+            values = [float(score) for _, score in self._redis.zrange(_LATENCY_P95, 0, -1, withscores=True)]
             if not values:
                 return 0.0
             values.sort()
