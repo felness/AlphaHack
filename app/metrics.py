@@ -2,11 +2,16 @@
 
 Хранятся в Redis (общее хранилище для всех воркеров), чтобы метрики
 отражали реальную нагрузку на весь сервис, а не на один воркер.
+
+Для производительности: каждый воркер накапливает метрики в L1-кэше
+и сбрасывает их в Redis раз в секунду (фоновый поток), чтобы не писать
+в Redis на каждый запрос.
 """
 from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
 
 import redis
@@ -17,11 +22,13 @@ logger = logging.getLogger("pii.metrics")
 _TOTAL_REQUESTS = "metrics:total_requests"
 _TOTAL_ERRORS = "metrics:total_errors"
 _TOTAL_TOKENS = "metrics:total_tokens"
-_RPS_WINDOW = "metrics:rps_window"      # ZSET: timestamp -> worker_id
-_TPS_WINDOW = "metrics:tps_window"      # ZSET: timestamp -> tokens
+_RPS_WINDOW = "metrics:rps_window"      # ZSET: score=timestamp
+_TPS_WINDOW = "metrics:tps_window"      # ZSET: score=tokens
 _LATENCY_SUM = "metrics:latency_sum"    # сумма latency (мс)
 _LATENCY_COUNT = "metrics:latency_count"
-_LATENCY_P95 = "metrics:latency_p95"    # ZSET: latency -> worker_id
+_LATENCY_P95 = "metrics:latency_p95"    # ZSET: score=latency
+
+_FLUSH_INTERVAL = 1.0  # сброс в Redis раз в секунду
 
 
 class Metrics:
@@ -38,30 +45,88 @@ class Metrics:
             health_check_interval=30,
             retry_on_timeout=True,
         )
+        # L1-агрегация (в памяти воркера)
+        self._l1_lock = threading.Lock()
+        self._l1_requests = 0
+        self._l1_errors = 0
+        self._l1_tokens = 0
+        self._l1_latency_sum = 0.0
+        self._l1_latency_count = 0
+        self._l1_rps: list[float] = []      # timestamps
+        self._l1_tps: list[tuple[float, int]] = []  # (timestamp, tokens)
+        self._l1_p95: list[float] = []      # latency values
+        self._worker_id = os.getpid()
+        self._stop = False
+        self._flush_thread = threading.Thread(target=self._flush_loop, daemon=True)
+        self._flush_thread.start()
 
     def record_request(self, latency_sec: float, tokens: int = 0, error: bool = False) -> None:
-        """Записывает метрику запроса в Redis."""
+        """Накапливает метрику в L1-кэше (быстро, без сети)."""
         now = time.time()
-        worker_id = os.getpid()
+        with self._l1_lock:
+            self._l1_requests += 1
+            if error:
+                self._l1_errors += 1
+            if tokens > 0:
+                self._l1_tokens += tokens
+                self._l1_tps.append((now, tokens))
+            self._l1_rps.append(now)
+            latency_ms = latency_sec * 1000
+            self._l1_latency_sum += latency_ms
+            self._l1_latency_count += 1
+            self._l1_p95.append(latency_ms)
+
+    def _flush_loop(self) -> None:
+        """Фоновый поток: сбрасывает L1-метрики в Redis раз в секунду."""
+        while not self._stop:
+            time.sleep(_FLUSH_INTERVAL)
+            self._flush()
+
+    def _flush(self) -> None:
+        """Сбрасывает накопленные метрики в Redis."""
+        with self._l1_lock:
+            requests = self._l1_requests
+            errors = self._l1_errors
+            tokens = self._l1_tokens
+            latency_sum = self._l1_latency_sum
+            latency_count = self._l1_latency_count
+            rps = self._l1_rps
+            tps = self._l1_tps
+            p95 = self._l1_p95
+            self._l1_requests = 0
+            self._l1_errors = 0
+            self._l1_tokens = 0
+            self._l1_latency_sum = 0.0
+            self._l1_latency_count = 0
+            self._l1_rps = []
+            self._l1_tps = []
+            self._l1_p95 = []
+
+        if requests == 0:
+            return
+
+        now = time.time()
         try:
             pipe = self._redis.pipeline()
-            pipe.incr(_TOTAL_REQUESTS)
-            if error:
-                pipe.incr(_TOTAL_ERRORS)
-            if tokens > 0:
+            pipe.incrby(_TOTAL_REQUESTS, requests)
+            if errors:
+                pipe.incrby(_TOTAL_ERRORS, errors)
+            if tokens:
                 pipe.incrby(_TOTAL_TOKENS, tokens)
-                pipe.zadd(_TPS_WINDOW, {f"{worker_id}:{now}": tokens})
-            pipe.zadd(_RPS_WINDOW, {f"{worker_id}:{now}": now})
-            latency_ms = latency_sec * 1000
-            pipe.incrbyfloat(_LATENCY_SUM, latency_ms)
-            pipe.incr(_LATENCY_COUNT)
-            pipe.zadd(_LATENCY_P95, {f"{worker_id}:{now}": latency_ms})
-            # Ограничиваем размер ZSET для p95 (храним последние 10000)
-            pipe.zremrangebyrank(_LATENCY_P95, 0, -10001)
+            if rps:
+                pipe.zadd(_RPS_WINDOW, {f"{self._worker_id}:{now}": now})
+            if tps:
+                pipe.zadd(_TPS_WINDOW, {f"{self._worker_id}:{now}": sum(t for _, t in tps)})
+            if latency_sum:
+                pipe.incrbyfloat(_LATENCY_SUM, latency_sum)
+                pipe.incrby(_LATENCY_COUNT, latency_count)
+            if p95:
+                pipe.zadd(_LATENCY_P95, {f"{self._worker_id}:{now}": sum(p95) / len(p95)})
+                pipe.zremrangebyrank(_LATENCY_P95, 0, -10001)
             pipe.execute()
             self._prune(now)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Не удалось записать метрику в Redis: %s", exc)
+            logger.warning("Не удалось сбросить метрики в Redis: %s", exc)
 
     def _prune(self, now: float) -> None:
         """Удаляет устаревшие записи из окон."""
@@ -79,10 +144,8 @@ class Metrics:
         try:
             now = time.time()
             cutoff = now - self._window
-            # Удаляем устаревшие
             self._redis.zremrangebyscore(_RPS_WINDOW, 0, cutoff)
             count = self._redis.zcard(_RPS_WINDOW)
-            # Считаем за фактическое время окна
             oldest = self._redis.zrange(_RPS_WINDOW, 0, 0, withscores=True)
             if not oldest:
                 return 0.0
