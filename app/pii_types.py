@@ -6,7 +6,7 @@
 - mask_char: символ маскирования
 - keep_edges: сколько символов оставить видимыми с начала/конца
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)

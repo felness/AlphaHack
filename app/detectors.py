@@ -6,11 +6,12 @@
 """
 from __future__ import annotations
 
+import logging
 import re
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Callable, Iterable
 
-from .pii_types import PiiType, get_pii_type
+logger = logging.getLogger("pii.detectors")
 
 
 @dataclass(frozen=True)
@@ -25,11 +26,6 @@ class Match:
 # ---------------------------------------------------------------------------
 # Вспомогательные утилиты
 # ---------------------------------------------------------------------------
-
-def _norm(s: str) -> str:
-    """Нормализация для сравнения: нижний регистр, схлопывание пробелов."""
-    return re.sub(r"\s+", " ", s).strip().lower()
-
 
 def _dedupe(matches: Iterable[Match]) -> list[Match]:
     """Убирает вложенные/пересекающиеся совпадения, оставляя самые длинные."""
@@ -139,17 +135,28 @@ RUSSIAN_SURNAMES = {
 
 # Страны (гражданство)
 COUNTRIES = {
-    "россия", "российской федерации", "рф", "ссср", "украина", "беларусь",
-    "белоруссия", "казахстан", "узбекистан", "таджикистан", "киргизия",
-    "киргизстан", "туркменистан", "азербайджан", "армения", "грузия",
-    "молдова", "молдавия", "литва", "латвия", "эстония", "польша",
-    "германия", "франция", "италия", "испания", "великобритания",
-    "соединённые штаты америки", "соединенные штаты америки", "сша", "сша",
-    "канада", "китай", "япония", "индия", "израиль", "турция", "финляндия",
-    "швеция", "норвегия", "дания", "нидерланды", "бельгия", "швейцария",
-    "австрия", "чехия", "словакия", "венгрия", "румыния", "болгария",
-    "сербия", "хорватия", "греция", "португалия", "ирландия", "исландия",
-    "австралия", "бразилия", "аргентина", "мексика", "египет", "юар",
+    "россия", "россии", "российской федерации", "российская федерация",
+    "рф", "ссср",
+    "украина", "украины", "беларусь", "белоруссия", "казахстан",
+    "казахстана", "узбекистан", "узбекистана", "таджикистан",
+    "таджикистана", "киргизия", "киргизстан", "туркменистан",
+    "туркменистана", "азербайджан", "азербайджана", "армения", "армении",
+    "грузия", "грузии", "молдова", "молдавия", "литва", "латвия", "эстония",
+    "польша", "польши", "германия", "германии", "франция", "франции",
+    "италия", "италии", "испания", "испании", "великобритания",
+    "великобритании", "соединённые штаты америки", "соединенные штаты америки",
+    "соединённых штатов америки", "соединенных штатов америки", "сша",
+    "канада", "канады", "китай", "китая", "япония", "японии", "индия",
+    "индии", "израиль", "израиля", "турция", "турции", "финляндия",
+    "финляндии", "швеция", "швеции", "норвегия", "норвегии", "дания",
+    "дании", "нидерланды", "нидерландов", "бельгия", "бельгии", "швейцария",
+    "швейцарии", "австрия", "австрии", "чехия", "чехии", "словакия",
+    "словакии", "венгрия", "венгрии", "румыния", "румынии", "болгария",
+    "болгарии", "сербия", "сербии", "хорватия", "хорватии", "греция",
+    "греции", "португалия", "португалии", "ирландия", "ирландии",
+    "исландия", "исландии", "австралия", "австралии", "бразилия",
+    "бразилии", "аргентина", "аргентины", "мексика", "мексики", "египет",
+    "египта", "юар",
 }
 
 # Ключевые слова для адресов
@@ -389,22 +396,29 @@ def detect_passport(text: str) -> list[Match]:
     return _dedupe(matches)
 
 
-def detect_department_code(text: str) -> list[Match]:
+def _detect_with_context(
+    text: str,
+    pattern: re.Pattern[str],
+    keywords: set[str],
+    pii_key: str,
+    context_before: int = 40,
+    context_after: int = 10,
+) -> list[Match]:
+    """Ищет совпадения паттерна, рядом с которыми есть ключевое слово."""
     matches = []
-    for m in DEPARTMENT_CODE_RE.finditer(text):
-        context = text[max(0, m.start() - 40):m.end() + 10].lower()
-        if any(kw in context for kw in DEPARTMENT_CODE_KEYWORDS):
-            matches.append(Match("passport_department_code", m.start(), m.end(), m.group()))
+    for m in pattern.finditer(text):
+        context = text[max(0, m.start() - context_before):m.end() + context_after].lower()
+        if any(kw in context for kw in keywords):
+            matches.append(Match(pii_key, m.start(), m.end(), m.group()))
     return matches
+
+
+def detect_department_code(text: str) -> list[Match]:
+    return _detect_with_context(text, DEPARTMENT_CODE_RE, DEPARTMENT_CODE_KEYWORDS, "passport_department_code")
 
 
 def detect_driver_license(text: str) -> list[Match]:
-    matches = []
-    for m in DRIVER_LICENSE_RE.finditer(text):
-        context = text[max(0, m.start() - 40):m.end() + 10].lower()
-        if any(kw in context for kw in DRIVER_LICENSE_KEYWORDS):
-            matches.append(Match("driver_license", m.start(), m.end(), m.group()))
-    return matches
+    return _detect_with_context(text, DRIVER_LICENSE_RE, DRIVER_LICENSE_KEYWORDS, "driver_license")
 
 
 def detect_date(text: str) -> list[Match]:
@@ -448,16 +462,13 @@ def detect_issue_date(text: str) -> list[Match]:
 def detect_fio(text: str) -> list[Match]:
     """Детектор ФИО на основе словарей имён/отчеств/фамилий."""
     matches = []
-    # Ищем последовательности: [Фамилия] Имя Отчество
-    # Паттерн: слово из словаря фамилий + имя + отчество, или имя + отчество
-    words = re.findall(r"[А-ЯЁа-яё]+", text)
     # Строим позиции слов
     positions = []
     for m in re.finditer(r"[А-ЯЁа-яё]+", text):
         positions.append((m.start(), m.end(), m.group().lower()))
 
     for i in range(len(positions)):
-        start, end, w = positions[i]
+        start, _, w = positions[i]
         # Имя + отчество
         if w in RUSSIAN_NAMES and i + 1 < len(positions):
             _, end2, w2 = positions[i + 1]
@@ -478,6 +489,35 @@ def detect_fio(text: str) -> list[Match]:
     return _dedupe(matches)
 
 
+def _find_address_keywords(lower: str) -> list[tuple[int, int]]:
+    """Находит и объединяет близкие ключевые слова адреса."""
+    kw_positions = []
+    for kw in ADDRESS_KEYWORDS:
+        for m in re.finditer(re.escape(kw), lower):
+            kw_positions.append((m.start(), m.end()))
+
+    kw_positions.sort(key=lambda x: x[0])
+
+    merged: list[tuple[int, int]] = []
+    for start, end in kw_positions:
+        if merged and start < merged[-1][1] + 60:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def _expand_address_end(text: str, end: int) -> int:
+    """Расширяет адрес до конца предложения или до 120 символов."""
+    end_ext = min(len(text), end + 120)
+    for sep in [".", ";\n", "\n"]:
+        idx = text.find(sep, end)
+        if idx != -1 and idx < end_ext:
+            end_ext = idx
+            break
+    return end_ext
+
+
 def detect_address(text: str) -> list[Match]:
     """Детектор адреса на основе ключевых слов.
 
@@ -486,33 +526,9 @@ def detect_address(text: str) -> list[Match]:
     """
     matches = []
     lower = text.lower()
-    # Находим все вхождения ключевых слов адреса
-    kw_positions = []
-    for kw in ADDRESS_KEYWORDS:
-        for m in re.finditer(re.escape(kw), lower):
-            kw_positions.append((m.start(), m.end(), kw))
 
-    # Сортируем по позиции
-    kw_positions.sort(key=lambda x: x[0])
-
-    # Объединяем близкие ключевые слова в один адрес
-    merged: list[tuple[int, int]] = []
-    for start, end, _ in kw_positions:
-        if merged and start < merged[-1][1] + 60:
-            # Продолжаем текущий адрес
-            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
-        else:
-            merged.append((start, end))
-
-    for start, end in merged:
-        # Расширяем до конца предложения или до 120 символов
-        end_ext = min(len(text), end + 120)
-        # Ищем конец предложения
-        for sep in [".", ";\n", "\n"]:
-            idx = text.find(sep, end)
-            if idx != -1 and idx < end_ext:
-                end_ext = idx
-                break
+    for start, end in _find_address_keywords(lower):
+        end_ext = _expand_address_end(text, end)
         value = text[start:end_ext].strip()
         if value:
             matches.append(Match("address", start, end_ext, value))
@@ -534,10 +550,11 @@ def detect_citizenship(text: str) -> list[Match]:
         for m in re.finditer(re.escape(kw), lower):
             # Ищем страну после ключевого слова
             after = text[m.end():m.end() + 30]
+            after_lower = after.lower()
             for country in COUNTRIES:
-                if country in after.lower():
+                if country in after_lower:
                     start = m.start()
-                    end = m.end() + after.lower().find(country) + len(country)
+                    end = m.end() + after_lower.find(country) + len(country)
                     matches.append(Match("citizenship", start, end, text[start:end]))
                     break
     return _dedupe(matches)
@@ -625,7 +642,8 @@ def detect_all(text: str) -> list[Match]:
     for detector in DETECTORS:
         try:
             all_matches.extend(detector(text))
-        except Exception:
+        except Exception as exc:  # noqa: BLE001
             # Детектор не должен ронять весь сервис
+            logger.warning("Детектор %s упал: %s", getattr(detector, "__name__", detector), exc)
             continue
     return _dedupe(all_matches)

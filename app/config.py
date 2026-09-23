@@ -1,5 +1,6 @@
 """Конфигурация приложения через pydantic-settings (.env)."""
 import json
+import secrets
 from functools import lru_cache
 from typing import Any
 
@@ -15,7 +16,7 @@ class Settings(BaseSettings):
     workers: int = 1
 
     # Безопасность
-    admin_key: str = "change-me-admin-key-32hex"
+    admin_key: str = secrets.token_hex(16)
     # Список систем, которым разрешено обращаться (через заголовок X-System-Id)
     allowed_systems: str = "default,test,prod"
     # Разрешить запросы без заголовка X-System-Id (нужно для нагрузочного теста,

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 from dataclasses import dataclass, field
@@ -13,6 +14,8 @@ from dataclasses import dataclass, field
 import redis
 
 from .masking import MaskedSpan
+
+logger = logging.getLogger("pii.store")
 
 
 @dataclass
@@ -59,11 +62,18 @@ class RedisMaskStore:
                 spans=spans,
                 created_at=data.get("created_at", time.time()),
             )
-        except Exception:
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Ошибка чтения записи из Redis: %s", exc)
             return None
 
     def __len__(self) -> int:
         return 0
+
+    def clear(self) -> None:
+        """Очищает все записи (используется в тестах)."""
+        keys = self._redis.keys("pii:*")
+        if keys:
+            self._redis.delete(*keys)
 
 
 # Глобальный экземпляр хранилища

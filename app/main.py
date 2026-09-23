@@ -52,13 +52,14 @@ async def metrics_middleware(request: Request, call_next):
             try:
                 body = await request.body()
                 tokens = len(body) // 4
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001 - тело запроса может бросить разные ошибки
+                logger.warning("Не удалось прочитать тело запроса: %s", exc)
         metrics.record_request(latency, tokens, error=response.status_code >= 500)
         return response
     except Exception:
         latency = time.monotonic() - start
         metrics.record_request(latency, error=True)
+        logger.exception("Ошибка обработки запроса %s %s", request.method, request.url.path)
         raise
 
 

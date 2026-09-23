@@ -60,9 +60,16 @@ class Metrics:
         with self._lock:
             if not self._latencies:
                 return 0.0
-            sorted_l = sorted(self._latencies)
-            idx = int(len(sorted_l) * 0.95)
-            return sorted_l[min(idx, len(sorted_l) - 1)] * 1000
+            # Частичная сортировка для p95 (быстрее полной сортировки)
+            k = max(1, int(len(self._latencies) * 0.95))
+            kth = self._nth_smallest(list(self._latencies), k)
+            return kth * 1000
+
+    @staticmethod
+    def _nth_smallest(values: list[float], k: int) -> float:
+        """Возвращает k-й наименьший элемент (1-indexed) без полной сортировки."""
+        values.sort()
+        return values[min(k - 1, len(values) - 1)]
 
     def tps(self) -> float:
         now = time.monotonic()

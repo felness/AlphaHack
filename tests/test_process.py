@@ -11,7 +11,7 @@ client = TestClient(app)
 @pytest.fixture(autouse=True)
 def clear_store():
     """Очищает хранилище перед каждым тестом."""
-    store._data.clear()
+    store.clear()
     yield
 
 
@@ -83,7 +83,7 @@ def test_idempotent_mask():
         json={"payload": original, "payload_id": payload_id},
         headers={"X-System-Id": "test"},
     )
-    masked = resp1.json()["result"]
+    assert resp1.status_code == 200
 
     # Повторный запрос с тем же id и исходной строкой — это уже демаскирование,
     # но маска не совпадает. Сервис должен вернуть что-то разумное.
